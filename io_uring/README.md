@@ -14,6 +14,7 @@
 
 而本次学习的io_uring酒桶上面的readv/writev系统调用一样,用连续的队列+一次特别的系统调用来替代多次的系统调用.
 
+<<<<<<< HEAD
 io_uring中有始终绕不开的基础原理,我们需要知道的是他通过提供两个环形队列(SQ,Submission Queue)和(CQ, Completion Queue),然后用多个I/O请求队列(SQE, Submission Queue Entries)来填充
 
 之后我们的任务就是使用`io_uring_setup`系统调用来创建队列,然后添加SQE到SQ,
@@ -100,4 +101,7 @@ struct io_uring_sqe {
 但实际上运用起来只会使用少部分 🐶
 
 
+=======
+io_uring中有始终绕不开的基础原理,我们需要知道的是他通过提供两个环形队列(SQ,Submission Queue)和(CQ, Completion Queue),然后用多个I/O请求队列(SQE, Submission Queue Entries)
+>>>>>>> afecb593353194142032866610c732a3163c0b2d
 
