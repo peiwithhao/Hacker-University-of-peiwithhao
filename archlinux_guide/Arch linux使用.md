@@ -1,0 +1,432 @@
+# Arch linux使用
+
+[toc]
+
+# 0x00.挂载/卸载qcow2文件系统
+
+```shell
+#!/bin/bash
+############ 挂载 ##############
+modprobe nbd max_part=16    #手动加载nbd模块,设置参数max_part=16
+qemu-nbd -c /dev/nbd0 /path/to/image.qcow2 #将我们需要查看的qcow2文件系统连接到nbd(network block device)模块
+partprobe /dev/nbd0 		#进行分区发现
+fdisk -l /dev/nbd0 			#通过fdisk可以查看该分区的信息
+mount /dev/nbd0p2 mountpoint 	#进行挂载
+
+############ 卸载 ##############
+umount mountpoint 			#挂载点卸载
+qemu-nbd -d /dev/nbd0 	 	#取消nbd的链接
+```
+
+# 0x01.较常用的qemu启动脚本(x86_64版本)
+
+首先是创建文件系统,有两种方式
+
+```bash
+dd if=/dev/zero of=ubuntu.img bs=1M count=8192
+```
+
+和
+
+```bash
+qemu-img create -f qcow2 win7.img 10G
+```
+
+```
+#!/bin/bash
+qemu-system-x86_64 \
+    -enable-kvm \
+    -m 1024 -smp 4 \
+    -boot order=cd \
+    -hda ./your/boot/disk/path/anything.qcow2'or'.img \
+    -net user -net nic,model=virtio \
+    -vga std \
+    -nic user,model=e1000,mac=52:54:98:76:54:32 \
+    -cdrom ./your/iso/path/anything.iso
+```
+
+# 0x02.pacman包管理
+
+包的删除
+
+```
+sudo pacman -R package-name
+sudo pacman -Rs package_name 	//删除依赖关系
+sudo pacman -Rn package_name  	//pacman删除某些程序会备份重要配置文件,在其中后面加上*.pacsave扩展名,-n可以避免备份
+sudo pacman -Rns $(pacman -Qdtq) 	//删除孤立包
+```
+
+升级软件包
+
+```
+sudo pacman -Syu
+```
+
+查询包数据库
+
+```
+pacman -Ss string1 string2 	//在包数据库中查询软件包
+pacman -Qs string1 string2 	//查询已安装的软件包
+pacman -F string1 string2 	//按文件名查找软件库
+pacman -Si package_name 	//显示软件包详细信息
+pacman -Qi package_name 	//显示本地安装包详细信息
+pacman -Qii package_name 	//将同时显示备份文件和修改状态
+pacman -Ql package_name 	//获取已安装软件包所包含文件的列表
+pacman -Fl pacakge_name 	//查看远程库软件包包含的文件
+pacman -Qk pacakge_name 	//查看软件包安装的文件是否都存在
+pacman -Qdt 				//罗列所有孤立包
+pacman -Qo filename         //查看该文件属于哪个包
+```
+
+清理包缓存
+
+```
+sudo paccache -r
+sudo pacman -Sc 		//删除目前没有安装的所有缓存的包
+sudo pacman -Scc 		//删除缓存所有文件,避免使用,这样会导致无法降级
+```
+
+其他
+
+```
+sudo pacman -Sw package_name 	//下载包但不安装他
+sudo pacman -U /path/to/package/package_name-version.pkg.tar.zst 	//从本地安装下载好的包
+sudo pacman -U file:///path/to/package/package_name-version.pkg.tar.zst 	//将本地包保存至缓存
+sudo pacman -U http://www.example.com/repo/example.pkg.tar.zs 	//安装远程包
+```
+
+如果说使用pacman的时候出现以下情景
+
+```sh
+error: failed to synchronize all databases (unable to lock database)
+```
+
+这里说明有一个pacman已经在使用,我们此时需要删除 `/var/lib/pacman/db.lck`即可再次使用
+
+
+如果说在重新安装某个包的时候,出现了文件冲突,可以采用下面的命令来覆盖掉相同的文件,前提当然是你知道自己在做什么😄
+
+```sh 
+pacman -S package-name --overwrite /usr/bin/libsndio.so
+```
+如果太多冲突的文件,并且你自身确定他确实需要覆盖,那么我们就可以使用下面的命令来批量修改
+
+```sh 
+$_ pacman -S package-name --overwrite '*'
+
+```
+
+
+
+# 0x03.网络管理
+
+```
+nmcli connection show 	//列出网络连接配置
+nmcli device wifi list 	//查看附近wi-fi网络
+nmcli device  			//查看所有网络设备以及状态
+nmcli device wifi connect SSID_或_BSSID password 密码 //连接到 Wi-Fi 网络
+nmcli device disconnect ifname eth0 //断开网络接口上的连接
+nmcli c 	//查看连接记录
+nmcli c del UUID 	//删除uuid连接
+ss -at 					//显示所有TCP连接以及相应服务名
+ss -atn 				//显示所有TCP俩皆以及端口号
+ss -au 					//显示所有UDP连接
+lsof -i :端口号 			//显示使用端口的进程
+
+```
+
+# 0x04.日志管理
+
+```
+journalctl --grep=PATTERN 		//显示PATTERN模式的日志
+journalctl -b 					//显示本次启动的信息
+journalctl -b -1 				//显示上次启动的信息
+journalctl -b -2 				//显示上上次启动的信息
+journalctl -p err..alert 		//只显示err/crit/emerg
+journalctl --since="20xx-xx-xx xx:xx:xx" 	//显示从具体时间开始的消息
+journalctl --since "20 min ago"
+journalctl -f 								//显示最新消息
+journalctl _PID=1 							//显示特定进程的所有消息
+journalctl -k 								//显示内核缓存消息
+journalctl --vacuum-size=100M 				//清理日志使总大小小于100M
+journalctl --vacuum-time=2weeks 			//清理最早两周前的日志
+journalctl --unit=UNIT 						//显示特殊systemd节点的日志信息,虽然这个似乎也可以通过systemctl status看
+journalctl --user-unit=UNIT 				//同上,用户版
+```
+
+![image-20231205183801431](/home/peiwithhao/.config/Typora/typora-user-images/image-20231205183801431.png)
+
+# 0x05.文件系统相关
+
+## rsync
+
+ssh连接中从远程文件与本地之间的同步，这里靠前的是源文件，靠后的是目的目录
+
+```sh
+rsync -avze "ssh -i /path/to/private_key" user@ip_address:/path/to/reomte_directory /path/to/local_directory 	//远程连接ssh若需要公钥时的拷贝
+```
+
+其中:
+
++ `-a`:以归档模式进行拷贝,保留文件的权限,时间戳等属性
++ `-v`:显示详细的输出信息,方便查看拷贝进度和日志
++ `-z`:启用压缩传输,减少数据传输量
+
+```
+rsync -P source destination     //其中-P与--partial --progress 选项的作用相同,显示进度, 可能需要使用-r/--recursive来递归到目录中传输
+rsync source host:destination    //远程复制
+rsync host:destination destination   //远程复制
+```
+
+
+
+## unzip
+
+如果说unzip解压出现乱码,可能是默认编码的问题,如果说在windows上压缩的文件在linux上打开,我们可以使用下面的命令
+
+```sh
+unzip -O CP936 <filename.zip>
+```
+
+## ranger使用
+
+### 3)，排序
+
+```
+os: 按大小排序 ob: 按名称排序 ot: 按文件类型排序 om:? 按 mtime(上一次修改文件内容的时间) 排序 
+```
+
+ranger 默认是以升序排列文件，你可以键入 “or” 使 ranger 以降序排列文件：
+
+```
+or: 反向排序 
+```
+
+### 4)，书签
+
+你可以设置一个书签以便快速的进入某个目录。
+
+```
+m<key>: 保存书签 `<key>: 跳到书签 
+```
+
+<key> 可以是任意的数字或字母。而且也 vim 不同，这写书签是永久保存的。
+
+**
+注：
+1,  （键盘 `1` 左边的键） 和 `'`（单引号） 是等效的。
+2, “`” 本身也是一个书签，代表上一次跳转的位置。你可以键入 ““” 跳到上一个跳转的位置。
+**
+
+### 5)，标签页（tab）
+
+ranger 支持多个标签页，可以快速地在多个标签页之间切换。
+
+```
+gn, Ctrl + N: 新建一个标签页 gt: 跳到下一个标签页 gT: 跳到上一个标签页 g<N>: 打开一个标签页，<N> 代表1到9的一个数字。如果这个标签页不存在的话，ranger 会自动创建。 gc, Ctrl + W: 关闭当前标签页，最后一个标签页不能关闭。 
+```
+
+### 1)，选择文件
+
+ranger 可以方便快速地选择多个文件。
+
+```
+: 选择一个文件，之后光标会自动跳到下一个条目 v: 反选 V or uv: 取消所有选择 
+Ctrl + V: 从某个位置开始选择 u(Ctrl + V): 取消选择到某个位置 
+```
+
+例如： (Ctrl + V) + gg: 选择从当前位置到顶部的所有条目， (Ctrl + V) + G: 选择从当前位置到底部的所有条目。u(Ctrl + V) 用法类似。
+
+```
+t: 标记/取消标记选择的条目 T: 取消标记选择的条目 
+```
+
+### 2)，查看文件
+
+```
+i: 查看当前文件的内容（文本文件） 
+```
+
+### 3)，编辑文件
+
+```
+E: 调用默认编辑器编辑文件 
+```
+
+### 4)，处理文件
+
+```
+:rename: 重命名 cw: 同 “:rename” A: 重命名，附加当前文件名 I: 同 “A”，但会将光标置于文件名之前 
+yy: 复制 dd: 剪切 pp: 粘贴，当存在同名文件时，会自动重命名。 po: 粘贴，覆盖同名文件 pl: 创建一个被复制/剪切文件的符号链接。 pL: 创建一个被复制/剪切文件的符号链接（相对路径）。 
+:delete 删除选定的条目 
+```
+
+如果删除的文件不止一个，ranger 会提示确认删除，键入 “y” 即可。也可以在输入命令时附加一个参数 “y”，跳过 ranger 的确认。
+
+```
+:delete y 
+```
+
+### 5)，运行文件
+
+```
+l: 打开选定文件，同 
+```
+
+如果没有选定文件的话，则打开当前文件。
+
+ranger 根据 apps.py 里面的定义来判断用什么程序来打开相应的文件。如果用户目录里没有文件 apps.py 的话，可以从 ranger/defaults/apps.py 复制到 ~/.config/ranger/ 下面。
+
+如果 ranger 不知道用什么程序打开相应文件，会出现 “:open_with” 对话框询问用户。
+也可以直接使用命令 ”r“ 打开 ”:open_with“ 对话框。
+
+```
+r: 用指定程序打开文件，同命令 ”:open_with“ 
+```
+
+:open_with 语法：
+
+```
+:open_with <program> <mode> <flags> 
+```
+
+<program>: 需要在 apps.py 中定义，CustomApplications 中每一个以 “app_” 开头的函数会被命令 “:open_with” 用到。
+
+<mode>: ranger 以何种模式运行程序。可用的 mode 有：
+
+```
+0: 窗口模式 1: 全屏模式 
+```
+
+<flags>: 指定 ranger 以何种方式调用程序。
+
+```
+s: silence 模式。任何输出将被丢弃。 d: 分离程序（在后台运行）。 p: 将输入重定向到 pager 。 w: 当程序执行完成时需要用户回车确认。 
+```
+
+大写 flag 可以得到相反的作用，例如一个程序如果默认就在后台运行，那么可以使用 “:open_with D” 来防止其在后台运行。
+
+按键 “S” 在当前目录下开启一个 shell ：
+
+```
+S: 在当前目录下开启一个 shell 。 
+```
+
+在执行某些操作（比如复制一个大文件）时不能立即完成，这在 ranger 中就是一个任务。你可以停止、启动某个任务，也可以对某个任务设置优先级。
+
+```
+w: 打开/关闭任务视图 dd: 终止一个任务 J: 降低当前任务的优先级 K: 提升当前任务的优先级 
+```
+
+命令以 “:” 开头。输入时可用 <Tab> 键补全，如果有多个匹配的，ranger 会依次遍历所有匹配项。
+
+所有命令被定义在文件 ranger/defaults/commands.py 中。
+
+可用的命令：
+
+```
+:cd <dirname> 跳转到目录 <dirname>  
+:chmod <octal_number> 设置被选条目的权限  
+:delete 删除被选条目  
+:edit <filename> 编辑文件  
+:filter <string> 只显示文件名中含有给定字符串 <string> 的文件  :find <regexp> 查找匹配给定正则表达式的文件，并且执行第一个匹配的文件  
+:grep <string> 在选定的条目中查找给定的字符串 <string>  :mark <regexp> 选定匹配正则表达式的所有文件  
+:unmark <regexp> 取消选定匹配正则表达式的所有文件  
+:mkdir <dirname> 创建目录  
+:open_with <program< <mode> <flags> 用给定的 <program>、<mode> 和 <flags> 打开文件。 所有参数都是可选的，未给出任何参数的时候，等价于 <Enter> 。  
+:quit 退出 quit  
+:rename <newname> 重命名当前文件  
+:search <regexp> 搜索所有匹配正则表达式 <regexp> 的文件，相当与 vim 中的 “/”。快捷键： "/"  
+:shell [-<flags>] <command> 运行命令 <command> 
+:touch <filename> 创建文件 
+```
+
+所有的命令（”:delete” 除外），可以不用写全，不过前提是和之匹配的命令只有一个。
+
+```
+z: 切换设置 u: 撤销操作 W: 打开 message log du: 显示当前目录的磁盘占用情况 R: 刷新当前目录 Ctrl + R: 清空缓存并刷新目录。 Ctrl + L: 重画当前窗口。 
+```
+
+## ls
+
+可以通过-i来显示文件的inode号
+
+```
+ls -i
+```
+
+## find
+
+```
+find <dir_path> -inum <inode_num>  //寻找inode号的文件
+find <dir_path> -printf '<format>' 		//设置输出格式
+```
+
+## awk
+
+输出指定列
+
+```
+awk '{print $1}' 		//打印输入信息的第一列
+```
+
+
+
+# 0x06.GDB调试
+
+在我们兴奋的调试内核的过程当中，即使我们已经得到了充满信息符号的内核镜像，damn我们仍有许多内核函数并没有编译出来符号信息，此时我们可以通过文件和行号来进行断点
+
+```
+break filename:line_number
+```
+
+# 0x07.权限相关
+
+查看当前进程所带权限
+
+```
+capsh --print
+```
+
+如果说没有capsh,那么我们也可以直接用原生态的linux proc虚拟文件系统来查看进程权限
+
+```
+cat /proc/self/status
+```
+
+# 0x08.窗口管理
+
+```sh
+xlsclients
+```
+
+显示wayland支持的程序
+
+# 0x09 Hyprland 
+
+## hyprpicker 取色器
+
+`-f | --format=[fmt]` specifies the output format (`cmyk`, `hex`, `rgb`, `hsl`, `hsv`)
+
+`-n | --no-fancy` disables the "fancy" (aka. colored) outputting
+
+`-h | --help` prints a help message
+
+`-a | --autocopy` automatically copies the output to the clipboard (requires [wl-clipboard](https://github.com/bugaevc/wl-clipboard))
+
+`-r | --render-inactive` render (freeze) inactive displays too
+
+`-z | --no-zoom` disable the zoom le
+
+# 0x0A 阅读
+
+博客批量修改
+
+```
+%s/!\[\(.*\)](\(.*\))/{% asset_image \2 %}
+```
+
+
+
+![](/home/peiwithhao/Pictures/screen_print/2024-07-21-10-21-26.png)
+
