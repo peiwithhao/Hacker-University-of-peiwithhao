@@ -205,7 +205,7 @@ size_t write_to_sq(char *file_path, struct submittors *s){
     next_tail = tail = *sring->tail;
     next_tail++;
     read_barrier();
-    index = tail & *s->sq_ring.ring_mask;
+    index = tail & *s->sq_ring.ring_mask;   //the real index in ring
     struct io_uring_sqe *sqe = &s->sqes[index];
     sqe->fd = file_fd;
     sqe->flags = 0;
@@ -266,6 +266,11 @@ size_t read_from_cq(struct submittors *s){
 
 
 int main(int argc, char **argv){
+    if(argc < 2){
+        printf("Usage: hog <file_name1> <file_name2> ...");
+        return 0;
+    }
+
     /* Construct the submittors which include the sq_ring and cq_ring */
     struct submittors s;
 

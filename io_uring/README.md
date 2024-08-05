@@ -40,7 +40,7 @@ struct io_uring_cqe {
 ## Submission Queue Entry
 
 比CQE会复杂的多,如下:
- 
+
 
 ```c 
 
@@ -103,6 +103,180 @@ struct io_uring_sqe {
 
 io_uring中有始终绕不开的基础原理,我们需要知道的是他通过提供两个环形队列(SQ,Submission Queue)和(CQ, Completion Queue),然后用多个I/O请求队列(SQE, Submission Queue Entries)
 
+
+## Use sys_*
+本节源码使用linux-5.15
+对于系统调用`io_uring_setup`,他用来创建sq和cq
+```c
+
+SYSCALL_DEFINE2(io_uring_setup, u32, entries,
+		struct io_uring_params __user *, params)
+{
+	return io_uring_setup(entries, params);
+}
+```
+
+我们可以看到传入的第二个参数是`struct io_uring_params`
+
+```c
+/*
+ * Passed in for io_uring_setup(2). Copied back with updated info on success
+ */
+struct io_uring_params {
+	__u32 sq_entries;
+	__u32 cq_entries;
+	__u32 flags;
+	__u32 sq_thread_cpu;
+	__u32 sq_thread_idle;
+	__u32 features;
+	__u32 wq_fd;
+	__u32 resv[3];
+	struct io_sqring_offsets sq_off;
+	struct io_cqring_offsets cq_off;
+};
+```
+这里的io_uring_params需要我们传进去一个用户的指针,在内核源码中检测的部分似乎只用到了flags
+
+```c
+
+static long io_uring_setup(u32 entries, struct io_uring_params __user *params)
+{
+	struct io_uring_params p;
+	int i;
+
+	if (copy_from_user(&p, params, sizeof(p)))
+		return -EFAULT;
+	for (i = 0; i < ARRAY_SIZE(p.resv); i++) {
+		if (p.resv[i])
+			return -EINVAL;
+	}
+    //p.flags只能使用以下标识符,否则报错
+	if (p.flags & ~(IORING_SETUP_IOPOLL | IORING_SETUP_SQPOLL |
+			IORING_SETUP_SQ_AFF | IORING_SETUP_CQSIZE |
+			IORING_SETUP_CLAMP | IORING_SETUP_ATTACH_WQ |
+			IORING_SETUP_R_DISABLED))
+		return -EINVAL;
+
+	return  io_uring_create(entries, &p, params);
+}
+```
+
+然后io_uring_create函数就负责创建cq_ring和sq_ring,
+具体调用链条如下:
+```c 
+io_uring_setup()
+    io_uring_create()    //创建struct io_uring_ctx, 这里面直接包含了sqes数组
+        io_ring_ctx_alloc()     //创建struct io_uring_ctx, 并初始化其中的基础内容
+        io_allocate_scq_urings()  //创建struct io_rings结构体,该结构体位于ctx中并且带有动态的cqe数组,然后分配ctx->sqes空间
+```
+
+
+在内核空间中创建好SQ和CQ后,用户态想要知道和使用他们该如和做呢,`io_uring_setup()`会返回一个文件句柄,
+用户就可以使用mmap来将两个缓冲区来映射到用户空间,
+
+```c
+    sq_ptr = mmap(0, sring_sz, PROT_READ | PROT_WRITE, 
+                  MAP_SHARED | MAP_POPULATE, 
+                  s->ring_fd, IORING_OFF_SQ_RING);
+```
+
+这样我们就可以使得内存和用户之间实现交互,至于我们如何得到环形数组的参数,我们可以通过`io_uring_setup()`函数所获得的`io_uring_params`来得到
+
+
+那么问题来了,我们如何使用这个io_uring呢?
+
+我们首先需要向sqes数组中中填充我们的sqe,数据结构体如下:
+
+```c 
+/*
+ * IO submission data structure (Submission Queue Entry)
+ */
+struct io_uring_sqe {
+	__u8	opcode;		/* type of operation for this sqe */
+	__u8	flags;		/* IOSQE_ flags */
+	__u16	ioprio;		/* ioprio for the request */
+	__s32	fd;		/* file descriptor to do IO on */
+	union {
+		__u64	off;	/* offset into file */
+		__u64	addr2;
+		struct {
+			__u32	cmd_op;
+			__u32	__pad1;
+		};
+	};
+	union {
+		__u64	addr;	/* pointer to buffer or iovecs */
+		__u64	splice_off_in;
+		struct {
+			__u32	level;
+			__u32	optname;
+		};
+	};
+	__u32	len;		/* buffer size or number of iovecs */
+	union {
+		__kernel_rwf_t	rw_flags;
+		__u32		fsync_flags;
+		__u16		poll_events;	/* compatibility */
+		__u32		poll32_events;	/* word-reversed for BE */
+		__u32		sync_range_flags;
+		__u32		msg_flags;
+		__u32		timeout_flags;
+		__u32		accept_flags;
+		__u32		cancel_flags;
+		__u32		open_flags;
+		__u32		statx_flags;
+		__u32		fadvise_advice;
+		__u32		splice_flags;
+		__u32		rename_flags;
+		__u32		unlink_flags;
+		__u32		hardlink_flags;
+		__u32		xattr_flags;
+		__u32		msg_ring_flags;
+		__u32		uring_cmd_flags;
+		__u32		waitid_flags;
+		__u32		futex_flags;
+		__u32		install_fd_flags;
+		__u32		nop_flags;
+	};
+	__u64	user_data;	/* data to be passed back at completion time */
+	/* pack this to avoid bogus arm OABI complaints */
+	union {
+		/* index into fixed buffers, if used */
+		__u16	buf_index;
+		/* for grouped buffer selection */
+		__u16	buf_group;
+	} __attribute__((packed));
+	/* personality to use, if used */
+	__u16	personality;
+	union {
+		__s32	splice_fd_in;
+		__u32	file_index;
+		__u32	optlen;
+		struct {
+			__u16	addr_len;
+			__u16	__pad3[1];
+		};
+	};
+	union {
+		struct {
+			__u64	addr3;
+			__u64	__pad2[1];
+		};
+		__u64	optval;
+		/*
+		 * If the ring is initialized with IORING_SETUP_SQE128, then
+		 * this field is used for 80 bytes of arbitrary command data
+		 */
+		__u8	cmd[0];
+	};
+};
+
+```
+
+我们需要注意的是该结构体当中的opcode字段,
+该字段就决定了我们要填入的sqe是为了实现什么功能,其他的字段就是为了适配该功能的sqe所需要的字段
+
+然后当我们读取cq的时候,我们只需要读取对应用户区域map的字段即可
 
 
 
