@@ -279,4 +279,90 @@ struct io_uring_sqe {
 然后当我们读取cq的时候,我们只需要读取对应用户区域map的字段即可
 
 
+## io_uring_enter
+这里源码取自linux5.13.13
+从较为简单的路径开始讲解,此时我们已经创建了SQ和CQ,那么现在需要通过该系统调用来提交sqe
+
+```c
+
+SYSCALL_DEFINE6(io_uring_enter, unsigned int, fd, u32, to_submit,
+
+		u32, min_complete, u32, flags, const void __user *, argp,
+		size_t, argsz)
+{
+    ....
+		submitted = io_submit_sqes(ctx, to_submit);
+    ...
+}
+```
+传入了类型为`struct io_uring_ctx`的变量,这个也是`io_uring_setup`返回文件fd的private_data
+
+我们继续向下跟进
+
+```c
+static int io_submit_sqes(struct io_ring_ctx *ctx, unsigned int nr)
+{
+		req = io_alloc_req(ctx);    //分配请求,我们将使用它来存取sqe
+    ...
+		sqe = io_get_sqe(ctx);      //获取sqring中的sqe 
+    ...
+		if (io_submit_sqe(ctx, req, sqe))
+			break;
+    ...
+}
+```
+
+然后我们来到`io_submit_sqe`
+```c
+
+static int io_submit_sqe(struct io_ring_ctx *ctx, struct io_kiocb *req,
+			 const struct io_uring_sqe *sqe)
+{
+    ...
+	ret = io_req_prep(req, sqe);
+    ...
+			io_queue_sqe(req);
+    ...
+}
+```
+
+这里只留了两个函数进行解释,其中`io_req_prep()`函数是为了使用sqe中的字段来填充req的字段`struct io_provide_buf`
+
+然后后面的`io_queue_sqe(req)`函数则在真正对该IO进行操作
+
+```c
+static void io_queue_sqe(struct io_kiocb *req)
+{
+    ...
+		__io_queue_sqe(req);
+    ...
+}
+```
+然而这里是封装,接着看
+```c
+static void __io_queue_sqe(struct io_kiocb *req)
+{
+    ...
+	ret = io_issue_sqe(req, IO_URING_F_NONBLOCK|IO_URING_F_COMPLETE_DEFER);
+    ...
+}
+
+```
+这里调用io_issue_sqe来通过opcode判断调用哪个函数
+
+```c
+static int io_issue_sqe(struct io_kiocb *req, unsigned int issue_flags)
+{
+    ...
+	switch (req->opcode) {
+	case IORING_OP_NOP:
+		ret = io_nop(req, issue_flags);
+		break;
+	case IORING_OP_READV:
+	case IORING_OP_READ_FIXED:
+	case IORING_OP_READ:
+    ...
+}
+```
+至此内核中对于IO函数处理的大致流程结束
 
