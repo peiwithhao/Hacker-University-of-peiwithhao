@@ -12,4 +12,5 @@ Welcome all hackers to come and teach :)
 |--|--|--|--|
 |[io_uring Knowledge](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/io_uring)|..|..|..|
 |[CVEs](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/CVEs)|..|..|..|
-|[Archlinux Guide](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/archlinux_guide)|..|..|
+|[Archlinux Guide](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/archlinux_guide)|..|..|..|
+|fuse|..|..|..|
