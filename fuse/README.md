@@ -31,6 +31,40 @@ FUSE全名(Filesystem in Userspace)用户下的文件系统,
 ```
 可以看到他做了很多事情
 
+所以这里我们需要做的第一步就是编写他的fops以及实现函数:
+```c
+static struct fuse_operations fops = {
+    .read  = hog_read,
+    .open  = hog_open,
+    .getattr = hog_getattr,
+    .readdir = hog_readdir
+};
+```
+这个结构体我们需要在宏定义添加下面版本的宏,我们需要大于等于26才能使用较为现代化的版本
+```c
+#if FUSE_USE_VERSION < 26
+#  include "fuse_compat.h"
+#  undef fuse_main
+#  if FUSE_USE_VERSION == 25
+```
+
+然后我们只需要在main函数进行注册即可
+```c
+int main(int argc, char **argv){
+    file_size = 0x1000;
+    return fuse_main(argc, argv, &fops, NULL);
+
+}
+```
+要想使用这个我们的用户文件系统,还需要手动执行命令例如
+```sh
+ mkdir -p /tmp/fuse_mount && ./hog_fs /tmp/fuse_mount
+```
+这个操作代表我们将该fuse文件系统挂载到`/tmp/fuse_mount`目录下,然后我们正常使用其中的接口即可
+
+
+
+
 
 
 # 参考
