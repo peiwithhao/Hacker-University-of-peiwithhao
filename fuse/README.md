@@ -63,8 +63,9 @@ int main(int argc, char **argv){
 这个操作代表我们将该fuse文件系统挂载到`/tmp/fuse_mount`目录下,然后我们正常使用其中的接口即可
 
 至于编译阶段我们可以直接将`libfuse/libfuse`项目编译为一个静态库然后链接到程序即可
+这里的编译选项我们可以直接照抄`libfuse/libfuse`程序库的example代码里面的编译选项
 ```sh
-gcc -static -D_FILE_OFFSET_BITS=64 hog_fs.c -o fs_extract/hog_fs -L./ -lfuse3 
+gcc -no-pie -static `pkg-config fuse3 --cflags --libs` hog_fs.c -o fs_extract/hog_fs -L./ -lfuse3 
 ```
 
 

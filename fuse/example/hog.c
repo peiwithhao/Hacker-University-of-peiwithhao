@@ -1,4 +1,4 @@
-#define FUSE_USE_VERSION 26
+#define FUSE_USE_VERSION 34
 #include <string.h>
 #include <unistd.h>
 #include <fuse.h>
@@ -31,13 +31,13 @@ static int hog_open(const char *path, struct fuse_file_info * file_info){
 }
 
 static int hog_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
-			struct fuse_file_info *file_info){
+			struct fuse_file_info *file_info, enum fuse_readdir_flags flags){
     /* 返回当前目录和上级目录信息 */
-    filler(buf, ".", NULL, 0);
-    filler(buf, "..", NULL, 0);
+    filler(buf, ".", NULL, 0, 0);
+    filler(buf, "..", NULL, 0, 0);
     return 0;
 }
-static int hog_getattr(const char *path, struct stat *stbuf){
+static int hog_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi){
     
     int result = 0;
     memset(stbuf, 0, sizeof(struct stat));
@@ -80,5 +80,4 @@ static struct fuse_operations fops = {
 int main(int argc, char **argv){
     file_size = 0x1000;
     return fuse_main(argc, argv, &fops, NULL);
-
 }
