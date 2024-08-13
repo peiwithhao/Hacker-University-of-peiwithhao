@@ -62,7 +62,10 @@ int main(int argc, char **argv){
 ```
 这个操作代表我们将该fuse文件系统挂载到`/tmp/fuse_mount`目录下,然后我们正常使用其中的接口即可
 
-
+至于编译阶段我们可以直接将`libfuse/libfuse`项目编译为一个静态库然后链接到程序即可
+```sh
+gcc -static -D_FILE_OFFSET_BITS=64 hog_fs.c -o fs_extract/hog_fs -L./ -lfuse3 
+```
 
 
 
