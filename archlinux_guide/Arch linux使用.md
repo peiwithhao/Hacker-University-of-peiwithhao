@@ -193,7 +193,10 @@ unzip -O CP936 <filename.zip>
 ### 3)，排序
 
 ```
-os: 按大小排序 ob: 按名称排序 ot: 按文件类型排序 om:? 按 mtime(上一次修改文件内容的时间) 排序 
+os: 按大小排序 
+ob: 按名称排序 
+ot: 按文件类型排序 
+om:? 按 mtme(上一次修改文件内容的时间) 排序 
 ```
 
 ranger 默认是以升序排列文件，你可以键入 “or” 使 ranger 以降序排列文件：
@@ -207,7 +210,9 @@ or: 反向排序
 你可以设置一个书签以便快速的进入某个目录。
 
 ```
-m<key>: 保存书签 `<key>: 跳到书签 
+m<key>: 保存书签 
+`<key>: 跳到书签 
+um<key>: 删除书签
 ```
 
 <key> 可以是任意的数字或字母。而且也 vim 不同，这写书签是永久保存的。
@@ -230,12 +235,11 @@ gn, Ctrl + N: 新建一个标签页 gt: 跳到下一个标签页 gT: 跳到上�
 
 ranger 可以方便快速地选择多个文件。
 
-```
-: 选择一个文件，之后光标会自动跳到下一个条目 v: 反选 V or uv: 取消所有选择 
-Ctrl + V: 从某个位置开始选择 u(Ctrl + V): 取消选择到某个位置 
-```
+使用V来开启/关闭选择模式
 
-例如： (Ctrl + V) + gg: 选择从当前位置到顶部的所有条目， (Ctrl + V) + G: 选择从当前位置到底部的所有条目。u(Ctrl + V) 用法类似。
+uv来撤销选择
+
+space来撤销单个选择
 
 ```
 t: 标记/取消标记选择的条目 T: 取消标记选择的条目 
@@ -380,6 +384,10 @@ awk '{print $1}' 		//打印输入信息的第一列
 break filename:line_number
 ```
 
+如果编译内核出现realloc报错,可以在`tools/lib/subcmd/Makefile`中的CFLAGS一项添加标志`-Wno-use-after-free`
+
+
+
 # 0x07.权限相关
 
 查看当前进程所带权限
@@ -394,6 +402,8 @@ capsh --print
 cat /proc/self/status
 ```
 
+
+
 # 0x08.窗口管理
 
 ```sh
@@ -402,7 +412,7 @@ xlsclients
 
 显示wayland支持的程序
 
-# 0x09 Hyprland 
+# 0x09.Hyprland 
 
 ## hyprpicker 取色器
 
@@ -418,7 +428,7 @@ xlsclients
 
 `-z | --no-zoom` disable the zoom le
 
-# 0x0A 阅读
+# 0x0A.阅读
 
 博客批量修改
 
@@ -430,3 +440,154 @@ xlsclients
 
 ![](/home/peiwithhao/Pictures/screen_print/2024-07-21-10-21-26.png)
 
+# 0x0B.编译
+
+## GCC
+无敌的编译器，编译选项如下：
+
+- `-nostdlib`:命令链接器忽略标注你的libc链接惯例，只编译给出的代码
+- `-c`:生成目标文件obj
+- `-o`:生成可执行文件
+- `-S`:生成汇编代码
+- `gcc --verbose test.c ./glibc-2.31.so -o test`：glibc2.34以上若想编译低版本，可采用此法
+
+如果想静态链接静态库的话,如下使用
+
+```
+gcc test.c -o test -L/path/to/library -l:mylib.a
+```
+
+## strip
+用来去除符号表，用法如下：
+- `strip <elf>`：去除符号表
+
+# 0x0C.trace技巧
+
+## ftrace
+我们需要在内核中自行挂载该临时文件系统,挂载方式如下:
+```
+mount -t tracefs nodev /sys/kernel/tracing  //挂载tracefs
+mount -t debugfs debugfs /sys/kernel/debug  //挂载debugfs
+```
+在我看来似乎两者差距不大,但是gpt给出的回答是tracefs更加适合性能调优,debugfs的使用场景则是深入了解操作系统内部状态
+
+在挂载成功后我们可以来使用其提供的文件接口
+这个文件用来查看当前的追踪者类型
+```
+/ # cat /sys/kernel/debug/tracing/current_tracer 
+nop
+```
+其中类型我们可以通过`available_tracers`文件来查看
+```
+/sys/kernel/debug/tracing # cat available_tracers 
+blk function_graph function nop
+```
+我们也可以查看trace是否开启
+```
+/sys/kernel/debug/tracing # cat tracing_on
+1
+```
+下面正式使用ftrace
+
+
+1. 设置tracer类型,这里设置为function
+```
+echo function > current_tracer
+```
+2. 设置过滤函数(tracer类型为function的情况下,这里的可选函数也可通过`available_filter_functions`)
+```
+echo dev_attr_show > set_ftrace_filter
+```
+除了追踪某些特定函数,也可以输出事件,我们可以通过命令`ls events`来查看
+
+而chompie师傅是采用了trace event来进行追踪
+我们可以方便的在内核启动参数添加trace_event=kmem:kmalloc,kmem:kfree来进行查看,此外我们也可以添加`no_hash_pointers`内核参数来删除虚拟内存地址的打印
+
+3. 查看追踪信息,这里我们的trace记录要清空也很简单,`echo 0 > trace`
+```
+cat trace
+```
+此外其也可以对于二进制文件本身的函数调用追踪，为Ryan O'Neill所著作，地址如下：
+
+[https://github.com/elfmaster/ftrace](https://github.com/elfmaster/ftrace)
+
+- `ftrace [-p <pid>] [-Sstve] <prog> <args>`:用法如下：
+- `[-p]`:根据PID追踪
+- `[-t]`:检测函数参数的类型
+- `[-s]`:打印字符串值
+- `[-v]`:显示详细输出
+- `[-e]`:显示各种ELF信息（符号、依赖）
+- `[-S]`:显示确实了符号的函数调用
+- `[-C]`:完成控制流分析
+
+
+## strace
+system call trace,基于ptrace(2)系统调用，可以用来收集运行时系统调用相关信息
+
+- `strace /bin/ls -o ls.out`:使用strace来跟踪一个基本程序
+- `strace -p <pid> -o daemon.out`:使用strace命令附加到一个现存的进程上，原始输出将会现实每个系统调用的文件描述编号，系统调用会将文件描述符作为参数，例如：`SYS_READ(3, buf, sizeof(buf))`
+- `strace -e read=3 /bin/ls`:查看读入到文件描述符3中的所有数据，也可以使用`-e write=3`查看写入的情况
+
+## ltrace
+library trace,他会解析共享库，也就是一个程序的链接信息，并打印处用到的库函数
+
+- `ltrace <program> -o program.out`:通过解析可执行文件的动态段并打印出共享库和静态库的实际符号和函数
+
+# 0x0D.二进制分析
+
+## patchelf
+用来修改ELF文件中动态库和链接器的绑定关系
+
+- `patchelf --set-rpath <libc.so.6_directory> <elf>`:修改动态库绑定关系
+- `patchelf --set-interpreter <ld> <elf>`:修改动态链接器绑定关系
+
+
+## objdump
+用来分析目标文件或可执行
+
+- `objdump -D <elf_object>`:查看ELF文件所有节的数据或代码
+- `objdump -d <elf_object>`:查看ELF文件中的程序代码
+- `objdump -tT <elf_object>`:查看所有符号
+
+## objcopy
+分析和修改任意类型的ELF目标文件，可以修改ELF节，或进行复制
+
+- `objcopy -only-section=.data <infile> <outfile>`:将data节从一个ELF文件复制到另一个文件中
+
+## readelf
+解析ELF二进制文件
+
+- `readelf -S <object>`:查询节头表
+- `readelf -l <object>`:查询程序头表
+- `readelf -s <object>`:查询程符号表
+- `readelf -h <object>`:查询ELF文件头数据
+- `readelf -r <object>`:查询重定位入口
+- `readelf -d <object>`:查询动态段
+
+# 0x0E.特殊文件
+
+## /proc/<pid\>/maps
+保存了一个进程镜像的布局，包括可执行文件、共享库、栈、堆和VDSO
+
+## /proc/kcore
+Linux内核的动态核心文件，他是以ELF核心文件的形式所展现出来的原生内存转储，GDB可以使用他来对内核进行调试和分析
+
+## /boot/System.map
+包含整个内核的所有符号
+
+## /proc/kallsyms
+与上面类似，区别就是kallsyms是内核所属的/proc的一个入口并且可以动态更新。如果说安装了新的LKM，符号会自动添加到/proc/kallsyms当中。他包含大部分符号，如果在`CONFIG_KALLSYMS_ALL`内核配置中指明，则可以包含内核中全部的符号。
+
+## /proc/iomem
+与`/proc/<pid>/maps`类似，如果想知道内核的text段所映射的物理内存位置，可以搜索Kernel字符串，利用如下指令：
+
+	dawn@dawn-virtual-machine:~$ sudo grep Kernel /proc/iomem
+	[sudo] password for dawn: 
+	  21000000-220025c7 : Kernel code
+	  22200000-22c8dfff : Kernel rodata
+	  22e00000-232466ff : Kernel data
+	  23598000-23bfffff : Kernel bss
+
+## /proc/cmdline
+
+显示内核启动参数
