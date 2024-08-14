@@ -1,0 +1,9 @@
+include<linux/fs.h>
+resource tmp_fd[int64]
+
+open$pwh_proc(file ptr64[in, string["/dev/tty"]], flag flags[open_flag]) tmp_fd
+read$pwh_proc(fd tmp_fd, buffer ptr64[in, array[int8]], count bytesize[buffer])
+write$pwh_proc(fd tmp_fd, buffer ptr64[out, array[int8]], count bytesize[buffer])
+close$pwh_proc(fd tmp_fd)
+
+open_flag = O_CREAT, O_RDWR, O_WRONLY, O_APPEND, O_ASYNC, O_CLOEXEC, O_DIRECT, O_DIRECTORY, O_DYSNC, O_EXCL, O_LARGEFILE, O_NOATIME, O_PATH
