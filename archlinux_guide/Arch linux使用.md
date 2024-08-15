@@ -384,7 +384,7 @@ awk '{print $1}' 		//打印输入信息的第一列
 break filename:line_number
 ```
 
-如果编译内核出现realloc报错,可以在`tools/lib/subcmd/Makefile`中的CFLAGS一项添加标志`-Wno-use-after-free`
+
 
 
 
@@ -442,6 +442,10 @@ xlsclients
 
 # 0x0B.编译
 
+## make
+
+如果make编译内核出现realloc报错,可以在`tools/lib/subcmd/Makefile`中的CFLAGS一项添加标志`-Wno-use-after-free` 
+
 ## GCC
 无敌的编译器，编译选项如下：
 
@@ -460,6 +464,22 @@ gcc test.c -o test -L/path/to/library -l:mylib.a
 ## strip
 用来去除符号表，用法如下：
 - `strip <elf>`：去除符号表
+
+## pkg-config
+
+主要是用来应用第三方库的时候来指明头文件和库文件,例如libfuse3的话,如下使用
+
+```shell
+pkg-config fuse3 --cflags --libs
+```
+
+这样返回的值在我的主机上面如下
+
+```
+-I/usr/include/fuse3 -lfuse3 -lpthread
+```
+
+
 
 # 0x0C.trace技巧
 
