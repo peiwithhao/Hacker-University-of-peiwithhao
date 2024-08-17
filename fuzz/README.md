@@ -99,8 +99,44 @@ print(content)
 >>> result.returncode
 0
 ```
+### 持续性Fuzzing
+现在我们持续性输入各种input到我们测试的程序当中看他是否会崩溃，我们可以将所有的输入数据和真实返回值成对存储在一起
+```python
 
+trails = 100
+program = 'bc'
 
+runs = []
+
+for i in range(trails):
+    data = fuzzer()
+    with open(FILE, "w") as f:
+        f.write(data)
+    result = subprocess.run([program, FILE], 
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            universal_newline=True)
+    runs.append((data, result))
+```
+这段代码将输入100次给我们的进程然后得到对应的返回值后组队输入到runs数组当中，然后我们可以查看runs数组中的情况，我们会发现得出正常的结果次数极少，而这在fuzz当中又恰好是正常的
+
+然后我们可以在后面查看我们的错误信息
+```python
+errors = [(data, result) for (data, result) in runs if result.stderr !="" ]
+(first_data, first_reault) = errors[0]
+print(repr(first_data))
+print(first_result.stderr)
+```
+那么runs数组中会有除了`illgal character, parse error, or syntax error`还会有其他有意思的东西吗，比如说你发现的crash或者bug?
+很遗憾并不多
+```python
+[result.stderr for (data, result) in runs if result.stderr != ""
+ and "illegal character" not in result.stderr
+ and "parse error" not in result.stderr
+ and "syntax error" not in result.stderr]
+```
+那么我们如何来改善这种情况呢？欲知后事如何，请看下回分解。
 
 
 
