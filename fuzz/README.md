@@ -138,7 +138,21 @@ print(first_result.stderr)
 ```
 那么我们如何来改善这种情况呢？欲知后事如何，请看下回分解。
 
+### 缓冲区溢出
+这里不必多说，我们可以利用fuzz来模拟一下拥有缓冲区溢出漏洞的场景
+```python
+from ExpectError import ExpectError
+def crash_if_too_long(s):
+    buffer = "Thursday"
+    if len(s) > len(buffer):
+        raise ValueError
 
+trails = 100
+with ExpectError():
+    for i in range(trails):
+        s = fuzzer()
+        crash_if_too_long(s)
+```
 
 # Reference
 [The Fuzzing Book](https://www.fuzzingbook.org/)

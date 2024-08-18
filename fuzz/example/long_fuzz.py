@@ -1,3 +1,4 @@
+from ExpectError import ExpectError
 trails = 100
 program = 'bc'
 
@@ -27,3 +28,16 @@ print(first_result.stderr)
  and "illegal character" not in result.stderr
  and "parse error" not in result.stderr
  and "syntax error" not in result.stderr]
+
+
+def crash_if_too_long(s):
+    buffer = "Thursday"
+    if len(s) > len(buffer):
+        raise ValueError
+
+with ExpectError():
+    for i in range(trails):
+        s = fuzzer()
+        crash_if_too_long(s)
+
+
