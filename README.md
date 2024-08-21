@@ -10,13 +10,16 @@ At its core, hacking is an art form that requires a blend of creativity, analyti
 The study of hacking techniques encompasses a wide array of methodologies, including penetration testing, social engineering, and cryptography. Each technique serves as a critical tool in the hacker's arsenal, enabling them to assess security measures, exploit weaknesses, and ultimately contribute to the development of robust cybersecurity protocols. Furthermore, the ethical implications of hacking underscore the importance of responsible practices, as the line between ethical and unethical hacking can often blur in the face of technological advancement.
 
 As we embark on this exploration of hacking techniques, we aim to cultivate a comprehensive understanding of the skills and knowledge required to navigate this dynamic field. By fostering a culture of innovation and ethical responsibility, we can empower the next generation of cybersecurity professionals to not only defend against threats but also to drive the evolution of technology in a secure and sustainable manner.
+
 ## Employee
-+ [Peiwithhao](https://github.com/peiwithhao)->[Job title]:teacher
++ [Peiwithhao](https://github.com/peiwithhao)
 
 
+## Cources
 |Course Currently taught|The upcoming course|Course that stops temporarily|Ended course|
 |--|--|--|--|
 |[io_uring Knowledge](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/io_uring)|..|..|..|
 |[CVEs](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/CVEs)|..|..|..|
 |[Archlinux Guide](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/archlinux_guide)|..|..|..|
-|fuse|..|..|..|
+|..|..|[fuse](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/fuse)|..|
+|fuzz|..|..|..|
