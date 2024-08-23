@@ -373,6 +373,21 @@ find <dir_path> -printf '<format>' 		//设置输出格式
 ```
 awk '{print $1}' 		//打印输入信息的第一列
 ```
+## 构建文件系统
+
+利用busybox构建的rootfs.cpio有时候是十分方便的,但是这个文件系统在格式上面和其他的比较流行的系统例如ext3等还是有一定差异,
+就比如如果我想利用`setxattr+fuse`来实现堆占位的话就会失败,因为setxattr这个设置文件额外变量的函数仅支持部分的文件系统例如ext3,实际测试如果使用rootfs.cpio会失败
+
+接下来我们首先制作空镜像文件
+```shell
+$ dd if=/dev/zero of=./rootfs.ext3 bs=1M count=100    #制作100M大小的空文件
+$ mkfs.ext3 rootfs.ext3                         #格式化该文件的格式为ext3
+$ mkdir fs
+$ mount -o loop rootfs.ext3 ./fs               # 将该文件挂载到文件夹当中供我们修改
+$ umount ./fs                   # 修改完后卸载,然后打包
+$ gzip --best -c rootfs.ext3 > rootfs.img.gz
+```
+
 
 
 
