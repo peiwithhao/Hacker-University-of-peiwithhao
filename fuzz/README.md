@@ -116,7 +116,7 @@ for i in range(trails):
                             stdin=subprocess.DEVNULL,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            universal_newline=True)
+                            universal_newlines=True)
     runs.append((data, result))
 ```
 这段代码将输入100次给我们的进程然后得到对应的返回值后组队输入到runs数组当中，然后我们可以查看runs数组中的情况，我们会发现得出正常的结果次数极少，而这在fuzz当中又恰好是正常的
@@ -124,10 +124,20 @@ for i in range(trails):
 然后我们可以在后面查看我们的错误信息
 ```python
 errors = [(data, result) for (data, result) in runs if result.stderr !="" ]
-(first_data, first_reault) = errors[0]
+(first_data, first_rsault) = errors[0]
 print(repr(first_data))
 print(first_result.stderr)
 ```
+在我自己机器上的测试如下:
+```sh
+'>&7=>4&86)2/79),>.594 7<7<<>9:$&#8? $<423>%&%>&0-1=$#.2 $#66<?)  /#/#"8-</9/>-=6\'=$(>+2'
+./input.txt 1: syntax error
+./input.txt 1: syntax error
+./input.txt 1: syntax error
+./input.txt 1: illegal character: :
+./input.txt 1: illegal character: $
+```
+
 那么runs数组中会有除了`illgal character, parse error, or syntax error`还会有其他有意思的东西吗，比如说你发现的crash或者bug?
 很遗憾并不多
 ```python
@@ -138,21 +148,71 @@ print(first_result.stderr)
 ```
 那么我们如何来改善这种情况呢？欲知后事如何，请看下回分解。
 
+## Fuzzing所寻找的Bugs
+
+
 ### 缓冲区溢出
 这里不必多说，我们可以利用fuzz来模拟一下拥有缓冲区溢出漏洞的场景
+
 ```python
-from ExpectError import ExpectError
+
+import os
+import subprocess
+from fuzzingbook.Fuzzer import *
+from fuzzingbook.ExpectError import ExpectError
 def crash_if_too_long(s):
-    buffer = "Thursday"
+    buffer = "pwh"
     if len(s) > len(buffer):
         raise ValueError
 
+crash_if_too_long("awesome peiwithhao!")
+```
+这里传入一个大的字符串会立刻导致出现ValueError
+
+```sh
+Traceback (most recent call last):
+  File "/home/peiwithhao/repo/Hacker-University-of-peiwithhao/fuzz/example/bugs_finder.py", line 10, in <module>
+    crash_if_too_long("awesome peiwithhao!")
+  File "/home/peiwithhao/repo/Hacker-University-of-peiwithhao/fuzz/example/bugs_finder.py", line 8, in crash_if_too_long
+    raise ValueError
+ValueError
+```
+同样可以采取fuzz的输入如下
+
+```python
 trails = 100
 with ExpectError():
     for i in range(trails):
         s = fuzzer()
         crash_if_too_long(s)
 ```
+### 检查缺失
+许多程序没有异常检查,取而代之的则是函数返回的状态码,比如getchar()和读文件中读到文件末尾返回的EOF
+那么如果我们的进行了一个非预期的输入呢,下面一个例子是模仿程序获取输入,但是如果字符过长会导致空转
+
+```python
+
+def hang_if_no_space(s):
+    i = 0
+    while True:
+        if i < len(s):
+            if s[i] == ' ':
+                break
+        i += 1
+```
+但我们可以使用timeout技巧来解决这一点,当接受时间过长就会爆出异常,如下:
+
+```python
+trials = 100
+with ExpectTimeout(2):
+    for i in range(trials):
+        s = fuzzer()
+        hang_if_no_space(s)
+```
+## 捕获Errors
+
+
+
 
 # Reference
 [The Fuzzing Book](https://www.fuzzingbook.org/)

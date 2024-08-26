@@ -1,4 +1,5 @@
 import random
+
 def fuzzer(max_length: int = 100, start_char: int = 32, char_range: int = 32):
     string_length = random.randrange(0, max_length+1)
     out = ""
