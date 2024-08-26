@@ -1,10 +1,13 @@
 import os
 import subprocess
-from .. import fuzzingbook
+from fuzzingbook.Fuzzer import *
 trails = 100
 program = 'bc'
 
 runs = []
+
+FILE = os.path.join("./", "input.txt")
+
 
 for i in range(trails):
     data = fuzzer()
