@@ -210,7 +210,81 @@ with ExpectTimeout(2):
         hang_if_no_space(s)
 ```
 ## 捕获Errors
+### 检查内存访问
+我们可以在编译参数中添加`-fsanitize=address`来在运行过程中检查越界错误
+有如下代码:
+```c
+# clang -fsanitize=address -g -o sanitize sanitize.c
+#include <stdlib.h>
+#include <string.h>
 
+int main(int argc, char** argv) {
+    /* Create an array with 100 bytes, initialized with 42 */
+    char *buf = malloc(100);
+    memset(buf, 42, 100);
+
+    /* Read the N-th element, with N being the first command-line argument */
+    int index = atoi(argv[1]);
+    char val = buf[index];
+
+    /* Clean up memory so we don't leak */
+    free(buf);
+    return val;
+}
+```
+这里可以看到有一个明显的越界漏洞,然后当我们输入一个大于100(当然熟悉glibc中内存分配源码的小伙伴会知道这里是不严谨的,但是为了形象就干脆这么说了)的值就会导致越界访问,然后sanitize就会打印以下内容
+
+```shell
+=================================================================
+==15608==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x50b0000000ae at pc 0x5b7bbc40db7c bp 0x7ffd3e7a0f70 sp 0x7ffd3e7a0f68
+READ of size 1 at 0x50b0000000ae thread T0
+    #0 0x5b7bbc40db7b  (/home/peiwithhao/repo/Hacker-University-of-peiwithhao/fuzz/example/fsanitize+0x15fb7b) (BuildId: a8df777576759904cf221029ee48948f8a8c7b2a)
+    #1 0x729655dfae07  (/usr/lib/libc.so.6+0x25e07) (BuildId: 98b3d8e0b8c534c769cb871c438b4f8f3a8e4bf3)
+    #2 0x729655dfaecb  (/usr/lib/libc.so.6+0x25ecb) (BuildId: 98b3d8e0b8c534c769cb871c438b4f8f3a8e4bf3)
+    #3 0x5b7bbc2d9064  (/home/peiwithhao/repo/Hacker-University-of-peiwithhao/fuzz/example/fsanitize+0x2b064) (BuildId: a8df777576759904cf221029ee48948f8a8c7b2a)
+
+0x50b0000000ae is located 10 bytes after 100-byte region [0x50b000000040,0x50b0000000a4)
+allocated by thread T0 here:
+    #0 0x5b7bbc3c5149  (/home/peiwithhao/repo/Hacker-University-of-peiwithhao/fuzz/example/fsanitize+0x117149) (BuildId: a8df777576759904cf221029ee48948f8a8c7b2a)
+    #1 0x5b7bbc40daef  (/home/peiwithhao/repo/Hacker-University-of-peiwithhao/fuzz/example/fsanitize+0x15faef) (BuildId: a8df777576759904cf221029ee48948f8a8c7b2a)
+    #2 0x729655dfae07  (/usr/lib/libc.so.6+0x25e07) (BuildId: 98b3d8e0b8c534c769cb871c438b4f8f3a8e4bf3)
+    #3 0x729655dfaecb  (/usr/lib/libc.so.6+0x25ecb) (BuildId: 98b3d8e0b8c534c769cb871c438b4f8f3a8e4bf3)
+    #4 0x5b7bbc2d9064  (/home/peiwithhao/repo/Hacker-University-of-peiwithhao/fuzz/example/fsanitize+0x2b064) (BuildId: a8df777576759904cf221029ee48948f8a8c7b2a)
+
+SUMMARY: AddressSanitizer: heap-buffer-overflow (/home/peiwithhao/repo/Hacker-University-of-peiwithhao/fuzz/example/fsanitize+0x15fb7b) (BuildId: a8df777576759904cf221029ee48948f8a8c7b2a) 
+Shadow bytes around the buggy address:
+  0x50affffffe00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x50affffffe80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x50afffffff00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x50afffffff80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x50b000000000: fa fa fa fa fa fa fa fa 00 00 00 00 00 00 00 00
+=>0x50b000000080: 00 00 00 00 04[fa]fa fa fa fa fa fa fa fa fa fa
+  0x50b000000100: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x50b000000180: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x50b000000200: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x50b000000280: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x50b000000300: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==15608==ABORTING
+```
 
 
 
