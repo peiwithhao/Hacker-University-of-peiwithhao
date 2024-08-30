@@ -286,6 +286,31 @@ Shadow byte legend (one shadow byte represents 8 application bytes):
 ==15608==ABORTING
 ```
 
+# Code Coverage
+如名字所言就是你这个异常input进去,代码所执行的条目覆盖情况,fuzzingbook也提供了对应的类别供我们使用
+
+其利用`sys.settrace(f)`来对函数`f()`来进行跟踪,具体情况如下
+```python
+
+def traceit(frame: FrameType, event: str, arg: Any) -> Optional[Callable]:
+    """Trace program execution. To be passed to sys.settrace()."""
+    if event == 'line':
+        global coverage
+        function_name = frame.f_code.co_name
+        lineno = frame.f_lineno
+        coverage.append(lineno)
+
+    return traceit
+
+
+def cgi_decode_traced(s: str) -> None:
+    global coverage
+    coverage = []
+    sys.settrace(traceit)  # Turn on
+    cgi_decode(s)
+    sys.settrace(None)    # Turn off
+```
+这里不得不赞叹一下python这个语言的便携性,对于函数的追踪显得如此简便
 
 
 # Reference
