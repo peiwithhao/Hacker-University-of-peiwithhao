@@ -22,4 +22,4 @@ As we embark on this exploration of hacking techniques, we aim to cultivate a co
 |[CVEs](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/CVEs)|..|..|..|
 |[Archlinux Guide](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/archlinux_guide)|..|..|..|
 |..|..|[fuse](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/fuse)|..|
-|fuzz|..|..|..|
+|[fuzz](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/fuzz)|..|..|..|
