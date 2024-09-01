@@ -312,6 +312,89 @@ def cgi_decode_traced(s: str) -> None:
 ```
 这里不得不赞叹一下python这个语言的便携性,对于函数的追踪显得如此简便
 
+我们也可以以覆盖率的大小作为标准来判定input的有效性,然后不断迭代我们的input来达到最高的覆盖率,我们可以使用fuzzingbook提供的python库来进行实验
+
+```python
+>>> from fuzzingbook.Fuzzer import *
+>>> from fuzzingbook.Coverage import *
+>>> sample = fuzzer()
+>>> sample
+'3)!(7\'<34#+7=":2--:'
+>>> with Coverage() as cov_fuzz:
+...     try:
+...             cgi_decode(sample)
+...     except:
+...             pass
+... 
+'3)!(7\'<34# 7=":2--:'
+>>> cov_fuzz.coverage()
+{('cgi_decode', 218), 
+ ('cgi_decode', 231), 
+ ('cgi_decode', 215), 
+ ('cgi_decode', 211), 
+ ('cgi_decode', 208), 
+ ('cgi_decode', 214), 
+ ('cgi_decode', 230), 
+ ('cgi_decode', 217), 
+ ('cgi_decode', 207), 
+ ('cgi_decode', 220), 
+ ('cgi_decode', 210), 
+ ('cgi_decode', 216), 
+ ('cgi_decode', 229), 
+ ('cgi_decode', 219), 
+ ('cgi_decode', 209)}
+```
+
+而我们的`cgi_decode`在文件中的行数是位于200~231的,这里明显有没有走到的地方
+
+接下来我们编写输入循环,来测量最大覆盖率的输入
+
+```python
+
+from fuzzingbook.Fuzzer import * 
+from fuzzingbook.Coverage import *
+
+trails = 100
+
+def population_coverage(population: List[str], function: Callable) \
+        -> Tuple[Set[Location], List[int]]:
+    cumulative_coverage: List[int] = []
+    all_coverage: Set[Location] = set()
+
+    for s in population:
+        with Coverage() as cov:
+            try:
+                function(s)
+            except:
+                pass
+        all_coverage |= cov.coverage()
+        cumulative_coverage.append(len(all_coverage))
+return all_coverage, cumulative_coverage
+def hundred_inputs() -> List[str]:
+    population = []
+    for i in range(trails):
+        population.append(fuzzer())
+    return population
+
+all_coverage, cumulative_coverage = \
+        population_coverage(hundred_inputs(), cgi_decode)
+
+# %matplotlib inline
+
+import matplotlib.pyplot as plt
+
+plt.plot(cumulative_coverage)
+plt.title('Coverage of cgi_decode() with random inputs')
+plt.xlabel('# of inputs')
+plt.ylabel('lines covered')
+plt.show()
+```
+
+然后我们最终所生成的图如下
+![fuzz coverage](/home/peiwithhao/Pictures/screen_print/2024-09-01-21-18-22.png)
+
+可以看到在我们输入20~40次的时候,程序整体的覆盖率已经达到最大
+
 
 # Reference
 [The Fuzzing Book](https://www.fuzzingbook.org/)
