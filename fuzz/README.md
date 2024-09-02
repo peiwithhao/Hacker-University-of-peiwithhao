@@ -393,7 +393,13 @@ plt.show()
 然后我们最终所生成的图如下
 ![fuzz coverage](/home/peiwithhao/Pictures/screen_print/2024-09-01-21-18-22.png)
 
-可以看到在我们输入20~40次的时候,程序整体的覆盖率已经达到最大
+可以看到在我们输入20~40次的时候,程序整体的覆盖率已经达到最大,
+然后我们可以查看多次测试下,随机输入的平均次数如下:
+
+![multi fuzz](img/Figure_1.png)
+
+这里拿其他类型语言的程序举例,例如C语言
+我们可以直接在编译器上面添加相对应参数就可以生成记录覆盖率的文件,例如gcc的就是`-ftest_coverage`
 
 
 # Reference

@@ -30,14 +30,31 @@ all_coverage, cumulative_coverage = \
 
 # %matplotlib inline
 
+
+# once
+
+trials = 100
 import matplotlib.pyplot as plt
 
-plt.plot(cumulative_coverage)
-plt.title('Coverage of cgi_decode() with random inputs')
+runs = 100
+
+sum_coverage = [0] * trails
+
+for run in range(runs):
+    all_coverage, coverage = population_coverage(hundred_inputs(), cgi_decode)
+    assert len(coverage) == trails
+    for i in range(trails):
+        sum_coverage[i] += coverage[i]
+
+average_coverage = []
+for i in range(trails):
+    average_coverage.append(sum_coverage[i] / runs)
+
+
+plt.plot(average_coverage)
+plt.title('Average of cgi_decode() with random inputs')
 plt.xlabel('# of inputs')
 plt.ylabel('lines covered')
 plt.show()
-
-
 
 
