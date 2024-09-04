@@ -1,6 +1,7 @@
 from urllib.parse import urlparse
 from fuzzingbook.Fuzzer import fuzzer
 import random
+from mutation_zero import mutate
 
 def http_program(url: str) -> bool:
     supported_schemes = ["http", "https"]
@@ -14,11 +15,16 @@ def http_program(url: str) -> bool:
 def is_valid_url(url: str) -> bool:
     try:
         result = http_program(url)
-        print("successfull")
         return True
     except ValueError as e:
-        print(e)
         return False
 
-assert is_valid_url("http://www.google.com/search?q=fuzzing")
-assert not is_valid_url("xyzzy")
+seed_input = "http://peiwithhao.github.io/search?q=fuzzing"
+valid_inputs = set()
+trails = 20
+for i in range(trails):
+    inp = mutate(seed_input)
+    if is_valid_url(inp):
+        valid_inputs.add(inp)
+
+print(len(valid_inputs)/trails)

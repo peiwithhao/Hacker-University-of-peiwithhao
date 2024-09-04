@@ -31,8 +31,5 @@ def mutate(s: str) -> str:
     mutators = random.choice(mutators)
     return mutators(s)
 
-seed_input = "awesome peiwithhao fuzzing"
-for i in range(10):
-    print(repr(mutate(seed_input)))
 
 
