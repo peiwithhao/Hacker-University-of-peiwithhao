@@ -1,3 +1,23 @@
+<!--toc:start-->
+- [Fuzzing](#fuzzing)
+  - [Random](#random)
+    - [Fuzzers](#fuzzers)
+    - [Runners](#runners)
+  - [简易Fuzzer](#简易fuzzer)
+  - [Fuzzing 外部的程序](#fuzzing-外部的程序)
+    - [创建输入文件](#创建输入文件)
+    - [激活外部程序](#激活外部程序)
+    - [持续性Fuzzing](#持续性fuzzing)
+  - [Fuzzing所寻找的Bugs](#fuzzing所寻找的bugs)
+    - [缓冲区溢出](#缓冲区溢出)
+    - [检查缺失](#检查缺失)
+  - [捕获Errors](#捕获errors)
+    - [检查内存访问](#检查内存访问)
+- [Code Coverage](#code-coverage)
+- [变异](#变异)
+- [Reference](#reference)
+<!--toc:end-->
+
 # Fuzzing
 ## Random
 首先我们知道Fuzz就是一系列随机的输入,乱拳打死老师傅,以这样的手法来测试出程序的漏洞,接下来我们通过`The Fuzzing Book`来了解其中的本质
@@ -400,6 +420,112 @@ plt.show()
 
 这里拿其他类型语言的程序举例,例如C语言
 我们可以直接在编译器上面添加相对应参数就可以生成记录覆盖率的文件,例如gcc的就是`-ftest_coverage`
+
+
+# 变异
+这里以url作为本章的例子,我们知道一个url具有以下格式
+```
+scheme://netloc/path?query#fragment
+```
+解析上述字段:
++ `scheme`:将要用到的协议
++ `etloc`:主机名
++ `path`:主机下的路径
++ `query`:一个键值对
++ `fragment`:接受文档的一个标记，例如章节名等
+
+我们可以通过python的urlparse类来轻松进行解析
+```python
+>>> from urllib.parse import urlparse
+>>> urlparse("stp://peiwithhao.github.io/search?catgory=LinuxKernel")
+ParseResult(scheme='stp', netloc='peiwithhao.github.io', path='/search', params='', query='catgory=LinuxKernel', fragment='')
+```
+
+下面写一个小小的url检测工具,然后来fuzz它
+
+```python
+
+from urllib.parse import urlparse
+from fuzzingbook.Fuzzer import fuzzer
+
+def http_program(url: str) -> bool:
+    supported_schemes = ["http", "https"]
+    result = urlparse(url)
+    if result.scheme not in supported_schemes:
+        raise ValueError("Scheme must be one of "+repr(supported_schemes))
+    if result.netloc == '':
+        raise ValueError("Host must be non-empty")
+    return True
+
+
+for i in range(1000):
+    try:
+        url = fuzzer(char_start = 32, char_range=96)
+        result = http_program(url)
+        print("Success!")
+    except ValueError as e:
+        pass
+```
+
+但为了得到正确的反馈,就必须scheme字段为http/https,并且主机名不能为空,在fuzzingbook网站上作者进行了一个小小的计算,最终得出的结果是需要几个月到一年的时间才几乎可能得到一个符合程序的fuzzer输入,那么我们该如何解决这种问题呢,接下来就引入变异输入的概念
+
+
+所谓变异就是就是对你的输入进行一个细微的修改,例如插入/删除/反转一位等等
+下面给出这几种例子
+
+```python
+import random
+def delete_random_character(s):
+    # Returns s with a random bit delete in a random position
+    if s == "":
+        return s
+    pos = random.randint(0, len(s) - 1)
+    return s[:pos] + s[pos + 1:]
+
+def insert_random_character(s):
+    # Returns s with a random bit inserted in a random position
+    pos = random.randint(0, len(s) - 1)
+    random_character = chr(random.randrange(32, 127))
+    return s[:pos + 1] + random_character + s[pos + 1:]
+
+def flip_random_character(s):
+    # Returns s with a random bit flipped in a random position
+    if s == "":
+        return s
+    pos = random.randint(0, len(s) - 1)
+    c = s[pos]
+    bit = 1 << random.randint(0, 6)
+    new_c = chr(ord(c) ^ bit)
+    return s[:pos] + new_c + s[pos + 1:]
+
+def mutate(s: str) -> str:
+    mutators = [
+            delete_random_character,
+            insert_random_character,
+            flip_random_character,
+            ]
+    mutators = random.choice(mutators)
+    return mutators(s)
+
+seed_input = "awesome peiwithhao fuzzing"
+for i in range(10):
+    print(repr(mutate(seed_input)))
+```
+
+其中结果大致如下:
+```sh
+'awesome peiwithahao fuzzing'
+'awesome peiwithhao fuzzi0ng'
+'awesome peiwkthhao fuzzing'
+'awesome peiwithhao fuzzinf'
+'aesome peiwithhao fuzzing'
+'awesome peiwathhao fuzzing'
+'awesome peiwithhao uzzing'
+'wesome peiwithhao fuzzing'
+'awesome peiwithlao fuzzing'
+'awEesome peiwithhao fuzzing'
+```
+
 
 
 # Reference
