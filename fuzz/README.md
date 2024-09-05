@@ -15,6 +15,7 @@
     - [检查内存访问](#检查内存访问)
 - [Code Coverage](#code-coverage)
 - [变异](#变异)
+  - [覆盖率指导变异](#覆盖率指导变异)
 - [Reference](#reference)
 <!--toc:end-->
 
@@ -558,6 +559,14 @@ for i in range(trails):
         valid_inputs.add(inp)
 ```
 
+那么我们fuzz多少次才能得到http->https的变异呢,我们可以使用下面的程序测试一下
+```sh
+❯ python3 http_mutation_fuzzer.py
+Success after 5240 trials in 0.005960848999166046 seconds
+```
+而上面的代码只能进行一次异变,除此之外我们可以进行一次输入多次变异,这样可以大大增加他的变异范围和速度
+
+## 覆盖率指导变异
 
 # Reference
 [The Fuzzing Book](https://www.fuzzingbook.org/)
