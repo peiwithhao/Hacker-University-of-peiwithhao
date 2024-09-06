@@ -567,6 +567,6 @@ Success after 5240 trials in 0.005960848999166046 seconds
 而上面的代码只能进行一次异变,除此之外我们可以进行一次输入多次变异,这样可以大大增加他的变异范围和速度
 
 ## 覆盖率指导变异
-
+这里的大概思路就是在出现了覆盖率的变化时就将触发的输入就放入population集合,然后之后的input就基于这个population集合进行变异
 # Reference
 [The Fuzzing Book](https://www.fuzzingbook.org/)

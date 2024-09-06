@@ -45,9 +45,12 @@ trails = 0
 #         print(i, "mutations:", repr(inp))
 #     inp = mutate(inp)
 
+from fuzzingbook.Fuzzer import Fuzzer
+
+
 class MutationFuzzer(Fuzzer):
     """Base class for mutational fuzzing"""
-    def __init__(self, seed: List[str],
+    def __init__(self, seed: list[str],
                  min_mutations: int = 2,
                  max_mutations: int = 10) -> None:
         """Constructor
@@ -55,7 +58,7 @@ class MutationFuzzer(Fuzzer):
         `min_mutations` - the min num of mutations to apply
         `max_mutations` - the max num of mutations to apply
         """
-        self.seed = seeds
+        self.seed = seed
         self.min_mutations = min_mutations
         self.max_mutations = max_mutations
         self.reset()
@@ -65,9 +68,31 @@ class MutationFuzzer(Fuzzer):
         self.population =  self.seed
         self.seed_index = 0
 
-Class C(C):
-    def new_method(self, args):
-        pass
+
+class MutationFuzzer(MutationFuzzer):
+    def mutate(self, inp: str) -> str:
+        return mutate(inp)
+    def create_candidate(self) -> str:
+        """Create a new candidate by mutating a population member"""
+        candidate = random.choice(self.population)
+        trials = random.randint(self.min_mutations, self.max_mutations)
+        for i in range(trials):
+            candidate = self.mutate(candidate)
+        return candidate
+    def fuzz(self) -> str:
+        if self.seed_index < len(self.seed):
+            # still seeding
+            self.inp = self.seed[self.seed_index]
+            self.seed_index += 1
+        else:
+            self.inp = self.create_candidate()
+        return self.inp
+
+# seed_input = "http://www.google.com/search?q=fuzzing"
+# mutation_fuzzer = MutationFuzzer(seed=[seed_input])
+# repeat_nr = 10
+# for i in range(repeat_nr):
+#     print(mutation_fuzzer.fuzz())
 
 
 
