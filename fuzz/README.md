@@ -570,3 +570,4 @@ Success after 5240 trials in 0.005960848999166046 seconds
 这里的大概思路就是在出现了覆盖率的变化时就将触发的输入就放入population集合,然后之后的input就基于这个population集合进行变异
 # Reference
 [The Fuzzing Book](https://www.fuzzingbook.org/)
+[AFL Author's strategy](https://lcamtuf.blogspot.com/2014/08/binary-fuzzing-strategies-what-works.html)
