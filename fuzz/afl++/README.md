@@ -11,8 +11,16 @@
 其他的环境变量设置可以参阅
 [https://aflplus.plus/docs/env_variables](https://aflplus.plus/docs/env_variables)
 然后接下来的步骤需要创建输入输出文件夹
+```shell
+$ mkdir input out
+$ echo 1 > input/1
+$ echo u fdas@ > input/2
+```
+然后就是开始fuzz过程
 
-
+```shell
+$ afl-fuzz -i input/ -o out/ ./vulnerable
+```
 
 
 # Reference

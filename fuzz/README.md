@@ -580,6 +580,83 @@ AFL可以利用覆盖率的反馈来学习如何在测试一个程序中达到�
 + 其不是一个完全的白盒的原因是AFL不基于重量级程序分析或约束解决方案
 + 其使用轻巧的程序工具来手机有关生成输入的覆盖率.如果说生成的输入增加了覆盖率,他将会被添加到种子语料库
 
+这里开始讲解`fuzzingbook/GreyboxFuzzer.py`中的代码
+
+```python
+
+class Mutator:
+    """Mutate strings"""
+
+    def __init__(self) -> None:
+        """Constructor"""
+        self.mutators = [
+            self.delete_random_character,
+            self.insert_random_character,
+            self.flip_random_character
+        ]
+```
+上述代码定义了拥有三种变异对象的集合
+
+```python
+
+class Mutator(Mutator):
+    def insert_random_character(self, s: str) -> str:
+        """Returns s with a random character inserted"""
+        pos = random.randint(0, len(s))
+        random_character = chr(random.randrange(32, 127))
+        return s[:pos] + random_character + s[pos:]
+```
+上述代码定义了一个重写类型,并且定义了其中的插入随机字符串的函数,和我们之前写的类似,然后其余两种变异函数也是以同样的方法进行插入,最后有一个总的类型
+
+```python
+class Mutator(Mutator):
+    def mutate(self, inp: Any) -> Any:  # can be str or Seed (see below)
+        """Return s with a random mutation applied. Can be overloaded in subclasses."""
+        mutator = random.choice(self.mutators)
+        return mutator(inp)
+```
+这里我们发现是随机分配一个变异器然后进行变异
+
+## Power Schedules能力调度
+这里介绍一个新的定义-Power Schedules,该指标的作用是用来给在populations集合当中的seeds来分配宝贵的fuzzing时间
+而我们的目标就是**通过最大化那些极具潜力的种子seeds所占用的fuzzing时间来在最短时间达到最大的覆盖率增长速度**
+
+而从population集合中选择seeds的可能性被称之为种子的`energe`
+在整个模糊测试的过程当中,我们需要优先考虑更有希望的种子.
+简单来讲我们不想要将精力浪费在不那么有潜力的seeds上面.而这个决策的过程就被称为Power Schedules.
+
+例如AFL将把更多的energe分配给短的,执行快的,更大覆盖率增长的种子
+
+然后来看看`fuzzingbook`所实现的`PowerSchedule`
+```python
+class PowerSchedule:
+    """Define how fuzzing time should be distributed across the population."""
+
+    def __init__(self) -> None:
+        """Constructor"""
+        self.path_frequency: Dict = {}
+
+    def assignEnergy(self, population: Sequence[Seed]) -> None:
+        """Assigns each seed the same energy"""
+        for seed in population:
+            seed.energy = 1
+
+    def normalizedEnergy(self, population: Sequence[Seed]) -> List[float]:
+        """Normalize energy"""
+        energy = list(map(lambda seed: seed.energy, population))
+        sum_energy = sum(energy)  # Add up all values in energy
+        assert sum_energy != 0
+        norm_energy = list(map(lambda nrg: nrg / sum_energy, energy))
+        return norm_energy
+
+    def choose(self, population: Sequence[Seed]) -> Seed:
+        """Choose weighted by normalized energy."""
+        self.assignEnergy(population)
+        norm_energy = self.normalizedEnergy(population)
+        seed: Seed = random.choices(population, weights=norm_energy)[0]
+        return seed
+```
+
 
 
 
