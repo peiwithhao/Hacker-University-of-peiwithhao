@@ -657,6 +657,29 @@ class PowerSchedule:
         return seed
 ```
 
+上述代码中的choose()简而言之就是首先将population集合中的seed的energe至1,然后遍历列表获取他的百分数作为norm_energe,然后来选择种子
+可以使用下面的命令测试
+```python
+>>> from fuzzingbook.GreyboxFuzzer import Mutator
+>>> from fuzzingbook.Coverage import Location
+>>> from fuzzingbook.GreyboxFuzzer import Seed
+>>> from fuzzingbook.GreyboxFuzzer import PowerSchedule
+>>> population = [Seed("A"), Seed("B"), Seed("C")]
+>>> schedule = PowerSchedule()
+>>> hits = {
+...     "A":0,
+...     "B":0,
+...     "C":0
+... }
+>>> for i in range(1000):
+...     seed = schedule.choose(population)
+...     hits[seed.data]+=1
+... 
+>>> hits
+{'A': 340, 'B': 348, 'C': 312}
+```
+
+其中发现击中数量大致一次
 
 
 
