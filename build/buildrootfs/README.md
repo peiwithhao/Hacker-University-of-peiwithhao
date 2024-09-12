@@ -5,3 +5,5 @@
 `Kernel->Linux Kernel, Bootloaders->U-Boot`
 
 然后等我们选择好配置之后,就直接开始编译`sudo make`,这里据说不能使用`-jn`来指定多核编译
+
+最终存储是放在`output/images/*`当中
