@@ -31,4 +31,3 @@ libbpf是一个用来方便用户编写eBPF程序的库函数框架,因此里面
 | bpf_get_func_arg_cnt()               | args_cnt                 | 获取追踪进程的参数个数                                       |
 
 
-

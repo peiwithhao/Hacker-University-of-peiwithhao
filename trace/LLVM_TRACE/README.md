@@ -1,3 +1,8 @@
+<!--toc:start-->
+- [!.生成LLVM IR](#生成llvm-ir)
+- [@.LLVM IR语法](#llvm-ir语法)
+<!--toc:end-->
+
 # !.生成LLVM IR
 用下列例子来说明如何将C代码转换为LLVM IR
 ```c
@@ -84,5 +89,5 @@ r"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-prot
 ector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cmov,+cx8,
 +fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 ```
-
+每个LLVM文件都定义了Module,每个Module包含一系列函数
 
