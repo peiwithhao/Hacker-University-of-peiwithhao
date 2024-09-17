@@ -23,3 +23,4 @@ As we embark on this exploration of hacking techniques, we aim to cultivate a co
 |[Archlinux Guide](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/archlinux_guide)|..|..|..|
 |..|..|[fuse](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/fuse)|..|
 |[fuzz](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/fuzz)|..|..|..|
+|[trace](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/trace)|..|..|..|
