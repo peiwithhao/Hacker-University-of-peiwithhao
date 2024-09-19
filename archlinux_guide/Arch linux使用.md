@@ -612,3 +612,27 @@ Linux内核的动态核心文件，他是以ELF核心文件的形式所展现出
 ## /proc/cmdline
 
 显示内核启动参数
+
+
+
+# 0x0F.服务管理
+
+通常如果要删除服务,那么可以使用systemctl首先暂停服务
+
+如果是用户服务,那么需要找到他的*.service文件然后删除
+
+最后使用`systemctl daemon-reload`来重新加载systemd
+
+
+# 0x10.Python相关
+如果希望接下来的实验位于一个python测试环境,那么可以利用python自带的venv,使用方法如下:
+```sh
+$ python -m venv <your tmp directory path>
+$ cd <your tmp directory path>
+$ source bin/activate
+```
+执行上述步骤我们以后使用python就是为刚刚的创建环境的python版本,并且在本shell下所构建的python包也会位于你所创建临时目录下
+如果希望卸载,我们可以在当前shell直接使用下面命令
+```sh
+$ deactivate
+```
