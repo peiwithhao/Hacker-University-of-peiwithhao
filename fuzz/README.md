@@ -16,6 +16,10 @@
 - [Code Coverage](#code-coverage)
 - [变异](#变异)
   - [覆盖率指导变异](#覆盖率指导变异)
+- [灰盒模糊测试](#灰盒模糊测试)
+  - [Power Schedules能力调度](#power-schedules能力调度)
+  - [升级灰盒测试](#升级灰盒测试)
+- [基于搜索的模糊测试](#基于搜索的模糊测试)
 - [Reference](#reference)
 <!--toc:end-->
 
@@ -753,6 +757,61 @@ l!od
 
 # 基于搜索的模糊测试
 传说中的启发式来了,当我们在进行模糊测试的时候如果产生了某个idea,例如希望在程序中达到特殊的状态时,我们可以对其进行搜索,如果我们可以预估几个程序的输入中哪个更接近我们正在寻找的输入,那么此信息就可以被称之为启发式信息
+
+那么首先我们需要确定该搜索空间的具体形象,例如说单个数值,数组或者说是XML文档
+在本次的示例,使用以下代码
+```python
+>>> def test_me(x,y):
+...     if x==2*(y+1):
+...             return True
+...     else:
+...             return False
+... 
+>>> test_me(0, 0)
+False
+>>> test_me(7, 3)
+False
+>>> test_me(6, 2)
+True
+```
+这样我们的输入被规范为(x, y),然后每个点都会拥有相邻的输入
+```
+x-1, y-1
+x-1, y
+x-1, y+1
+x, y+1
+x+1, y+1
+x+1, y
+x+1, y-1
+x, y-1
+```
+
+然后这里定义一个获取相邻节点的函数
+```python
+def neighbors(x, y):
+    return [(x+dx, y+dy) for dx in [-1, 0, 1]
+            for dy in [-1, 0, 1]
+            if (dx != 0 or dy !=0)
+            and ((MIN <= x+dx <= MAX)
+                 and(MIN <= y+dy <= MAX))]
+
+print(neighbors(2,2))
+```
+打印以下内容
+```sh
+[(1, 1), (1, 2), (1, 3), (2, 1), (2, 3), (3, 1), (3, 2), (3, 3)]
+```
+
+所有的启发式功能都基与估计给定的候选解决方案有多良好,这里的"好"通常称为个体的和适度(fitness),并且估计这种和适度的被称为和适度函数(fitness function)
+
+考虑到上面测试函数,现在给出他的fitness function 如下:
+```python
+def calculate_distance(x, y):
+    return abs(x - 2*(y+1))
+
+print(calculate_distance(274, 153))
+```
+这样会输出34作为绝对距离
 
 
 # Reference
