@@ -810,9 +810,161 @@ def calculate_distance(x, y):
     return abs(x - 2*(y+1))
 
 print(calculate_distance(274, 153))
-```
-这样会输出34作为绝对距离
+``` 这样会输出34作为绝对距离,而该函数就作为我们的fitness function
+![fitness](img/fitness.png)
 
+现在拥有了适合度计算的函数,我们需要知道如何来获取最佳的适合度,
+
+其中我们需要使用到名为`Hillclimbing`的算法来完成,这个算法很简单:
+1. 随机选定一个起点
+2. 计算该点的所有邻居的和适度
+3. 移动到最佳和适度的邻居
+4. 如果问题未解决,则继续步骤2
+
+```python
+def hillclimber():
+    # Create and evaluate starting point
+    x, y = random.randint(MIN, MAX), random.randint(MIN, MAX)
+    fitness = get_fitness(x, y)
+    print("Initial value %d, %d at fitness %.4f" % (x, y, fitness))
+    iterations = 0
+    logs = 0
+
+    while fitness > 0:
+        iterations += 1
+        for nx, ny in neighbors(x, y):
+            new_fitness = get_fitness(nx, ny)
+            if new_fitness < fitness:
+                x, y = nx, ny
+                fitness = new_fitness
+            if logs < LOG_VALUES:
+                print("New value: %d, %d at fitness %.4f" % (x, y, fitness))
+            elif logs == LOG_VALUES:
+                print("...")
+            logs += 1
+            break
+    print("Found optimum after %d iterations at %d, %d" % (iterations, x, y))
+
+hillclimber()
+```
+不断选择最优节点,而这个函数实现是一旦找到最新更合适的neighbor则进行跳转,可以看到他的迭代次数是较多的
+
+```sh
+❯ python3 search_fuzzer.py
+Initial value 971, -198 at fitness 1365.0000
+New value: 970, -198 at fitness 1364.0000
+New value: 969, -198 at fitness 1363.0000
+New value: 968, -198 at fitness 1362.0000
+New value: 967, -198 at fitness 1361.0000
+New value: 966, -198 at fitness 1360.0000
+New value: 965, -198 at fitness 1359.0000
+New value: 964, -198 at fitness 1358.0000
+New value: 963, -198 at fitness 1357.0000
+New value: 962, -198 at fitness 1356.0000
+New value: 961, -198 at fitness 1355.0000
+New value: 960, -198 at fitness 1354.0000
+New value: 959, -198 at fitness 1353.0000
+New value: 958, -198 at fitness 1352.0000
+New value: 957, -198 at fitness 1351.0000
+New value: 956, -198 at fitness 1350.0000
+New value: 955, -198 at fitness 1349.0000
+New value: 954, -198 at fitness 1348.0000
+New value: 953, -198 at fitness 1347.0000
+New value: 952, -198 at fitness 1346.0000
+New value: 951, -198 at fitness 1345.0000
+...
+Found optimum after 1365 iterations at -394, -198
+```
+那么现在我们若改为获取邻居中最小的再进行跳转呢
+```python
+❯ python3 search_fuzzer.py
+Initial value 995, 521 at fitness 49.0000
+New value: 994, 520 at fitness 48.0000
+New value: 995, 520 at fitness 47.0000
+New value: 996, 520 at fitness 46.0000
+New value: 995, 519 at fitness 45.0000
+New value: 996, 519 at fitness 44.0000
+New value: 997, 519 at fitness 43.0000
+New value: 996, 518 at fitness 42.0000
+New value: 997, 518 at fitness 41.0000
+New value: 998, 518 at fitness 40.0000
+New value: 997, 517 at fitness 39.0000
+New value: 998, 517 at fitness 38.0000
+New value: 999, 517 at fitness 37.0000
+New value: 998, 516 at fitness 36.0000
+New value: 999, 516 at fitness 35.0000
+New value: 1000, 516 at fitness 34.0000
+New value: 999, 515 at fitness 33.0000
+New value: 1000, 515 at fitness 32.0000
+New value: 999, 514 at fitness 31.0000
+New value: 1000, 514 at fitness 30.0000
+New value: 999, 513 at fitness 29.0000
+...
+Found optimum after 22 iterations at 1000, 499
+```
+awesome!我们只迭代了22次就迭代到了最终解决方法
+但是!我们不是每次fuzz都能如此顺利的使用hillclimbing算法来获取结果
+因为我们可能面临下面一种情况,那就是我们当前节点的所有邻居都没有没有更好的和适度,如下面的函数
+```python
+test_me2(x, y):
+    if(x * x = y * y * (x % 20)):
+        return True
+    else:
+        return False
+```
+这种情况下最简单的办法就是重新开始,立刻从另一个随机数作为起点继续hillclimbing
+
+```python
+def test_me2_instrumented(x, y):
+    global distance
+    distance = abs(x * x - y * y * (x % 20))
+    if(x * x == y * y * (x % 20)):
+        return True
+    else:
+        return False
+
+def bad_fitness(x, y):
+    global distance
+    test_me2_instrumented(x, y)
+    fitness = distance
+    return fitness
+
+def restarting_hillclimber(fitness_function):
+    data = []
+    
+    #Create and evaluate starting point
+    x, y = random.randint(MIN, MAX), random.randint(MIN, MAX)
+    fitness = fitness_function(x, y)
+    data += [fitness]
+    print("Initial value: %d, %d at fitness %.4f" % (x, y, fitness))
+    iterations = 0
+
+    # Stop once we have found an optimal solution
+    while fitness > 0:
+        changed = False
+        iterations += 1
+        # Move to first neighbor with a better fitness
+        for (nx, ny) in neighbors(x, y):
+            new_fitness = fitness_function(nx, ny)
+            if new_fitness < fitness:
+                x, y = nx, ny
+                fitness = new_fitness
+                data += [fitness]
+                changed = True
+                break
+        if not changed:
+            x, y = random.randint(MIN, MAX), random.randint(MIN, MAX)
+            fitness = fitness_function(x, y)
+            data += [fitness]
+    print("Found optimum after %d iterations at %d, %d" % (iterations, x, y))
+restarting_hillclimber(bad_fitness)
+```
+最终测试多次也基本位于100次左右
+```sh
+❯ python3 search_fuzzer.py
+Initial value: -144, -97 at fitness 129808.0000
+Found optimum after 99 iterations at -719, 719
+```
 
 # Reference
 [The Fuzzing Book](https://www.fuzzingbook.org/)
