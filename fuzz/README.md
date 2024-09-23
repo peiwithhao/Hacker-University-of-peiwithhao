@@ -965,7 +965,29 @@ restarting_hillclimber(bad_fitness)
 Initial value: -144, -97 at fitness 129808.0000
 Found optimum after 99 iterations at -719, 719
 ```
+然后我们调高MIN, MAX范围来画图
+![restart_fitness](img/restart_fitness.png)
+横轴data数组的下标,数轴则是该data元素的fitness值,而可以看到在最终趋于0的过程当中我们有多次的restarting
 
+## 测试复杂程序
+刚刚是演示了一个简单的例子,接下来将测试之前了解到的`cgi_decode`
+我们按照上面的步骤,首先需要找到每一个输入的邻居
+```python
+def neighbor_strings(x):
+    n = []
+    for pos in range(len(x)):
+        c = ord(x[pos])
+        if c < 126:
+            n += [x[:pos] + chr(c+1) + x[pos + 1:]]
+        if c > 32:
+            n += [x[:pos] + chr(c-1) + x[pos + 1:]]
+    return n
+```
+这里是遍历每一个字符串当中的字符,然后按照ASCII码值来生成neighbors
+这里设计出了得到neighbors的函数,接下来的步骤便是设计和适度检测的函数`fitness_function`
+
+## 分支距离
+上面的test_me()函数由一各单个if条件生成,
 # Reference
 [The Fuzzing Book](https://www.fuzzingbook.org/)
 [AFL Author's strategy](https://lcamtuf.blogspot.com/2014/08/binary-fuzzing-strategies-what-works.html)

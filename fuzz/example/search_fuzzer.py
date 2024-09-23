@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import random
-MAX = 1000
+MAX = 10000
 MIN = -MAX
 LOG_VALUES = 20
 
@@ -130,8 +130,12 @@ def restarting_hillclimber(fitness_function):
             fitness = fitness_function(x, y)
             data += [fitness]
     print("Found optimum after %d iterations at %d, %d" % (iterations, x, y))
+    fig = plt.figure()
+    ax = plt.axes()
+    xs = range(len(data))
+    ax.plot(xs, data)
+    plt.show()
 
 
 restarting_hillclimber(bad_fitness)
-
 
