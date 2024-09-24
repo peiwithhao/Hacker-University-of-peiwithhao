@@ -14,12 +14,17 @@
   - [捕获Errors](#捕获errors)
     - [检查内存访问](#检查内存访问)
 - [Code Coverage](#code-coverage)
-- [变异](#变异)
+- [变异mutation](#变异mutation)
   - [覆盖率指导变异](#覆盖率指导变异)
 - [灰盒模糊测试](#灰盒模糊测试)
   - [Power Schedules能力调度](#power-schedules能力调度)
   - [升级灰盒测试](#升级灰盒测试)
 - [基于搜索的模糊测试](#基于搜索的模糊测试)
+  - [测试复杂程序](#测试复杂程序)
+  - [条件判断](#条件判断)
+    - [全局变量](#全局变量)
+    - [临时变量](#临时变量)
+    - [辅助函数](#辅助函数)
 - [Reference](#reference)
 <!--toc:end-->
 
@@ -427,7 +432,7 @@ plt.show()
 我们可以直接在编译器上面添加相对应参数就可以生成记录覆盖率的文件,例如gcc的就是`-ftest_coverage`
 
 
-# 变异
+# 变异mutation
 这里以url作为本章的例子,我们知道一个url具有以下格式
 ```
 scheme://netloc/path?query#fragment
@@ -986,8 +991,78 @@ def neighbor_strings(x):
 这里是遍历每一个字符串当中的字符,然后按照ASCII码值来生成neighbors
 这里设计出了得到neighbors的函数,接下来的步骤便是设计和适度检测的函数`fitness_function`
 
-## 分支距离
-上面的test_me()函数由一各单个if条件生成,
+## 条件判断
+上面的test_me()函数由一个单个if条件生成,而这里我们所测试的函数`cgi_decode()`则有好几个条件判断语句,也就是说我们的分支距离判断需要有好几种类型, 这里设置分支距离为目标字符距离我们规范数组里面字符的最近距离 如下:
+### 全局变量
+```python
+def distance_character(target, values):
+    # Initialize with very large value so that any comparison is better
+    minimum = sys.maxsize
+    for elem in values:
+        distance = abs(target - elem)
+        if distance < minimum:
+            minimum = distance
+    return minimum
+```
+### 临时变量
+当我们处理复杂分支条件如`if A and B`时,这个条件的distance我们可以等价于这两者条件distance的和`distance_A + distance_B`,因为需要两者都为True才能进入条件
+而当处理`if A or B`时,我们自然而然这个条件的distance是两者的较小值`MIN(distance_A, distance_B)`
+因为我们只需要一个条件满足就可以进行下一部分
+
+但是这在实际环境当中并不简单, 有点程序采用short-circuit评估标准,那就是在`A or B`的条件下,如果A为true,那么便不会执行B的判断,而如果说B是一个有着副作用的表达式,那么通过计算`short-curcuit`评估标准下的B的分支距离可能会导改变程序的行为,而这一行为是不能接受的
+
+例子如下,有这样一个判断:
+```
+distance = abs(x - 2*foo(y))
+if x == 2 * foo(y):
+... 
+```
+如果我们照往常来设计instrument的话,那我们将执行foo()两次,而这两次的返回值很大概率是不同的,一个避免这个问题的方法就是转换这个判断条件例如可以将比较的值先暂存到临时变量,然后条件语句比较这两者
+
+```python
+tmp1 = x
+tmp2 = 2 * foo(y)
+distance = abs(tmp1 - tmp2)
+if tmp1 == tmp2:
+    ...
+```
+### 辅助函数
+除了使用全局和临时变量的另一中方法是将时机比较替换为对辅助函数的调用, 这里给出例子
+```python
+def evaluate_condition(num, op, lhs, rhs):
+    distance_true = 0
+    distance_false = 0
+    if op == "Eq":
+        if lhs == rhs:
+            distance_false = 1
+        else:
+            distance_true = abs(lhs - rhs)
+    # ... code for other types of conditions
+    if distance_true == 0:
+        return True
+    else:
+        return False
+```
+可以看到分别传递操作码op, 和两个操作数lhs, rhs然后最后返回判断条件
+
+但是上面的判断条件函数还没将运行时的distance进行记录,这样也导致我们无法通过fitnesss function来接近目标
+
+由于被测试函数cgi_decode()存在多个条件判断,并且我们可能对其中的True和False都感兴趣,那么我们就可以创建True和False集合
+
+```python
+def update_maps(condition_num, d_true, d_false):
+    global distances_true, distances_false
+    if condition_num in distances_true.keys():
+        distances_true[condition_num] = min(distances_true[condition_num], d_true)
+    else:
+        distances_true[condition_num] = d_true
+    if condition_num in distances_false.keys():
+        distances_false[condition_num] = min(distances_false[condition_num], d_false)
+    else:
+        distances_false[condition_num] = d_false
+```
+这里的变量`condition_num`是我们测量的条件唯一ID, 
+
 # Reference
 [The Fuzzing Book](https://www.fuzzingbook.org/)
 [AFL Author's strategy](https://lcamtuf.blogspot.com/2014/08/binary-fuzzing-strategies-what-works.html)
