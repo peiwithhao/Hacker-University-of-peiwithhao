@@ -1061,7 +1061,113 @@ def update_maps(condition_num, d_true, d_false):
     else:
         distances_false[condition_num] = d_false
 ```
-这里的变量`condition_num`是我们测量的条件唯一ID, 
+这里的变量`condition_num`是我们测量的判断条件唯一ID,如果我们第一次执行一个特殊的条件,那么他的distance_true和distance_false将会记录到对应的集合当中,但是也有可能一次同样的测试执行了多次, 
+例如在我们测试的程序当中`i < len(s)`在每次循环都会执一遍,在最终我们希望一次测试仅产生单一的和适度fitness, 由于覆盖分支只需要至少一次执行,那么字典将会通过是否更接近分支来判断是否将本次测试结果加入集合当中
+
+接下来我们在evaluate_condition()里面调用该集合进行一个记录
+```python
+def evaluate_condition(num, op, lhs, rhs):
+    distance_true = 0
+    distance_false = 0
+
+    if isinstance(lhs, str):
+        lhs = ord(lhs)
+    if isinstance(rhs, str):
+        rhs = ord(rhs)
+
+    if op == "Eq":
+        if lhs == rhs:
+            distance_false = 1
+        else:
+            distance_true = abs(lhs - rhs)
+    elif op == "Lt":
+        if lhs < rhs:
+            distance_false = abs(lhs - rhs)
+        else:
+            distance_true = lhs - rhs + 1
+    elif op == "In":
+        minimum = sys.maxsize
+        for elem in rhs.keys():
+            distance = abs(lhs - ord(elem))
+            if distance < minimum:
+                minimum = distance
+        distance_true == 0
+        if distance_true == 0:
+            distance_false = 1
+    update_maps(num, distance_true, distance_false)
+
+    # ... code for other types of conditions
+    if distance_true == 0:
+        return True
+    else:
+        return False
+
+```
+这里存在三种类型, 分别是`Eq, Lt, In`,对应三种分支等于, 小于, 存在
+然后我们需要将该函数的判断条件修改为我们的辅助函数
+
+这里用到了python 提供的AST库来实现,
+```python
+class BranchTransformer(ast.NodeTransformer):
+    branch_num = 0
+    def visit_FunctionDef(self, node):
+        node.name = node.name + "_instrumented"
+        return self.generic_visit(node)
+    def visit_Compare(self, node):
+        if node.ops[0] in [ast.Is, ast.IsNot, ast.NotIn]:
+            return node
+        self.branch_num += 1
+        return ast.Call(func=ast.Name("evaluate_condition", ast.Load()),
+                        args = [ast.Num(self.branch_num),
+                                ast.Str(node.ops[0].__class__.__name__), 
+                                node.left,
+                                node.comparators[0]],
+                        keywords = [],
+                        starargs = None,
+                        kwargs = None)
+
+
+source = inspect.getsource(cgi_decode)
+node = ast.parse(source)
+BranchTransformer().visit(node)
+
+node = ast.fix_missing_locations(node)
+print(ast.unparse(node), '.py')
+```
+最终得出的效果是
+```python
+
+def cgi_decode_instrumented(s):
+    """Decode the CGI-encoded string `s`:
+       * replace "+" by " " replace "%xx" by the character with hex number xx.
+       Return the decoded string.  Raise `ValueError` for invalid inputs.""
+"
+    hex_values = {'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '
+7': 7, '8': 8, '9': 9, 'a': 10, 'b': 11, 'c': 12, 'd': 13, 'e': 14, 'f': 15
+, 'A': 10, 'B': 11, 'C': 12, 'D': 13, 'E': 14, 'F': 15}
+    t = ''
+    i = 0
+    while evaluate_condition(1, 'Lt', i, len(s)):
+        c = s[i]
+        if evaluate_condition(2, 'Eq', c, '+'):
+            t += ' '
+        elif evaluate_condition(3, 'Eq', c, '%'):
+            digit_high, digit_low = (s[i + 1], s[i + 2])
+            i += 2
+            if evaluate_condition(4, 'In', digit_high, hex_values) and eval
+uate_condition(5, 'In', digit_low, hex_values):
+                v = hex_values[digit_high] * 16 + hex_values[digit_low]
+                t += chr(v)
+            else:
+                raise ValueError('Invalid encoding')
+        else:
+            t += c
+        i += 1
+    return t.py
+```
+
+
+
 
 # Reference
 [The Fuzzing Book](https://www.fuzzingbook.org/)

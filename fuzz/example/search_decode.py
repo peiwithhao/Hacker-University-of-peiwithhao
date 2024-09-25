@@ -1,4 +1,6 @@
 import sys
+import inspect
+import ast
 def cgi_decode(s):
     """Decode the CGI-encoded string `s`:
        * replace "+" by " "
@@ -97,6 +99,31 @@ def evaluate_condition(num, op, lhs, rhs):
     else:
         return False
 
+class BranchTransformer(ast.NodeTransformer):
+    branch_num = 0
+    def visit_FunctionDef(self, node):
+        node.name = node.name + "_instrumented"
+        return self.generic_visit(node)
+    def visit_Compare(self, node):
+        if node.ops[0] in [ast.Is, ast.IsNot, ast.NotIn]:
+            return node
+        self.branch_num += 1
+        return ast.Call(func=ast.Name("evaluate_condition", ast.Load()),
+                        args = [ast.Num(self.branch_num),
+                                ast.Str(node.ops[0].__class__.__name__), 
+                                node.left,
+                                node.comparators[0]],
+                        keywords = [],
+                        starargs = None,
+                        kwargs = None)
 
-print(evaluate_condition(1, "Eq", 10, 20))
-print(evaluate_condition(2, "Eq", 20, 20))
+
+source = inspect.getsource(cgi_decode)
+node = ast.parse(source)
+BranchTransformer().visit(node)
+
+node = ast.fix_missing_locations(node)
+print(ast.unparse(node))
+
+
+
