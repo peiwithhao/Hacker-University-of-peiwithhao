@@ -1091,7 +1091,7 @@ def evaluate_condition(num, op, lhs, rhs):
             distance = abs(lhs - ord(elem))
             if distance < minimum:
                 minimum = distance
-        distance_true == 0
+        distance_true == minimum
         if distance_true == 0:
             distance_false = 1
     update_maps(num, distance_true, distance_false)
@@ -1108,6 +1108,10 @@ def evaluate_condition(num, op, lhs, rhs):
 
 这里用到了python 提供的AST库来实现,
 ```python
+
+import inspect
+import ast
+from fuzzingbook.bookutils import print_content
 class BranchTransformer(ast.NodeTransformer):
     branch_num = 0
     def visit_FunctionDef(self, node):
@@ -1132,14 +1136,13 @@ node = ast.parse(source)
 BranchTransformer().visit(node)
 
 node = ast.fix_missing_locations(node)
-print(ast.unparse(node), '.py')
+print_content(ast.unparse(node), '.py')
 ```
 最终得出的效果是
 ```python
 
 def cgi_decode_instrumented(s):
-    """Decode the CGI-encoded string `s`:
-       * replace "+" by " " replace "%xx" by the character with hex number xx.
+    """Decode the CGI-encoded string `s`: * replace "+" by " " replace "%xx" by the character with hex number xx.
        Return the decoded string.  Raise `ValueError` for invalid inputs.""
 "
     hex_values = {'0': 0, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '
@@ -1163,8 +1166,27 @@ uate_condition(5, 'In', digit_low, hex_values):
         else:
             t += c
         i += 1
-    return t.py
+    return t
 ```
+
+## 遗传算法
+random hillclimbing也被成为1+1进化算法(1+1 evolutionary algorithm),其试图模仿进化的自然过程.(1+1)EA是一种特异性的进化算法,人口大小为1,可完全产生一个后代,而最创建的搜索算法实际上是遗传算法(Genetic Algorithm)
+
+GA是基于可以遗传上编码问题解决方案的想法:
+染色体由一系列基因组成, 每个基因都编码个体的一个特征.
+
+拿`cgi_decode`距离,可以将每个字符比作基因,然后染色体是一系列字符,可以说上面所用到的就是基因编码的形态,但是对于GA我们需要有不同的实现形式
+
+GA也就是基因算法模拟进化的过程:
++ 创建一个随机基因序列的初始种群
++ 选择合适的个体进行重构
++ 通过重构选择的个体来生产新的种群
++ 继续这个循环直到出现解决方案或达到某种限制
+
+
+
+
+
 
 
 
