@@ -636,3 +636,29 @@ $ source bin/activate
 ```sh
 $ deactivate
 ```
+
+# 0x11.屏幕录制/截取
+推荐使用wf-recorder
+```shell
+$ wf-recorder --audio -o file_name -g "$(slurp)"
+```
+而这里的audio有时会默认为输入的麦克风,我们可以在此指定相关内容
+而音频设备可以用以下指令查看
+```sh
+❯ pactl list sources | grep "名称"
+	名称：alsa_output.pci-0000_00_1f.3-platform-skl_hda_dsp_generic.HiFi__HDMI3__sink.monitor
+	名称：alsa_output.pci-0000_00_1f.3-platform-skl_hda_dsp_generic.HiFi__HDMI2__sink.monitor
+	名称：alsa_output.pci-0000_00_1f.3-platform-skl_hda_dsp_generic.HiFi__HDMI1__sink.monitor
+	名称：alsa_output.pci-0000_00_1f.3-platform-skl_hda_dsp_generic.HiFi__Speaker__sink.monitor
+	名称：alsa_input.pci-0000_00_1f.3-platform-skl_hda_dsp_generic.HiFi__Mic2__source
+	名称：alsa_input.pci-0000_00_1f.3-platform-skl_hda_dsp_generic.HiFi__Mic1__source
+	名称：bluez_sink.CC_14_BC_B5_89_61.a2dp_sink.monitor
+```
+
+
+
+
+
+
+
+
