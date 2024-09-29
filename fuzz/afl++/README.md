@@ -26,4 +26,20 @@ $ afl-fuzz -i input/ -o out/ ./vulnerable
 # Reference
 [https://github.com/mykter/afl-training](https://github.com/mykter/afl-training)
 [https://ghcr.io/mykter/fuzz-training](https://ghcr.io/mykter/fuzz-training)
+[](https://aflplus.plus/docs/tutorials/libxml2_tutorial/)
+[https://bananamafia.dev/post/gb-fuzz/](https://bananamafia.dev/post/gb-fuzz/)
+
+[https://bushido-sec.com/index.php/2023/06/19/the-art-of-fuzzing/](https://bushido-sec.com/index.php/2023/06/19/the-art-of-fuzzing/)
+
+[https://securitylab.github.com/research/fuzzing-challenges-solutions-1](https://securitylab.github.com/research/fuzzing-challenges-solutions-1)
+
+[https://securitylab.github.com/research/fuzzing-software-2](https://securitylab.github.com/research/fuzzing-software-2)
+
+[https://securitylab.github.com/research/fuzzing-sockets-FTP](https://securitylab.github.com/research/fuzzing-sockets-FTP)
+
+[https://securitylab.github.com/research/fuzzing-sockets-FreeRDP](https://securitylab.github.com/research/fuzzing-sockets-FreeRDP)
+
+[https://securitylab.github.com/research/fuzzing-apache-1](https://securitylab.github.com/research/fuzzing-apache-1)
+
+[https://mmmds.pl/fuzzing-map-parser-part-1-teeworlds/](https://mmmds.pl/fuzzing-map-parser-part-1-teeworlds/)
 
