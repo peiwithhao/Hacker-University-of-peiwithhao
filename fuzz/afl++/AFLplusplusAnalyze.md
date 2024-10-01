@@ -168,6 +168,10 @@ void check_asan_opts(afl_state_t *afl) {
 ```
 
 
+## fix_up_sync
+这个函数主要是为了使得`afl->out_dir`和当使用-S时的`sync_dir`有效化
+新配置out_dir和sync_dir
+
 
 
 
