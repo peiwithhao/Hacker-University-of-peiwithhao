@@ -167,13 +167,47 @@ void check_asan_opts(afl_state_t *afl) {
   ...
 ```
 
-
 ## fix_up_sync
 这个函数主要是为了使得`afl->out_dir`和当使用-S时的`sync_dir`有效化
 新配置out_dir和sync_dir
 
+下面介绍几种调度器类型
+```c
+enum {
 
+  /* 00 */ EXPLORE, /* AFL default, Exploration-based constant schedule */
+  /* 01 */ MMOPT,   /* Modified MOPT schedule           */
+  /* 02 */ EXPLOIT, /* AFL's exploitation-based const.  */
+  /* 03 */ FAST,    /* Exponential schedule             */
+  /* 04 */ COE,     /* Cut-Off Exponential schedule     */
+  /* 05 */ LIN,     /* Linear schedule                  */
+  /* 06 */ QUAD,    /* Quadratic schedule               */
+  /* 07 */ RARE,    /* Rare edges                       */
+  /* 08 */ SEEK,    /* EXPLORE that ignores timings     */
 
+  POWER_SCHEDULES_NUM
+
+};
+```
+如果调度器范围位于[FAST, RARE], 则动态的为调度器分配内存
+```c
+  /* Dynamically allocate memory for AFLFast schedules */
+  if (afl->schedule >= FAST && afl->schedule <= RARE) {
+
+    afl->n_fuzz = ck_alloc(N_FUZZ_SIZE * sizeof(u32));
+
+  }
+```
+这之后便是一系列标识位的设置
+
+## FAST(exponential)
+## COE(cut-off exponential)
+## LIN(linear)
+## QUAD(quadratic)
+## MMOPT(modified M0pt)
+## RARE(rare edge focus)
+## SEEK(seek)
+## EXPLORE(exploration-based constant)
 
 
 
