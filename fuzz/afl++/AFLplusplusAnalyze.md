@@ -680,10 +680,28 @@ enum {
 
   }
 ```
-这之后便是一系列标识位的设置
+这之后便是一系列通过传递的环境变量来设置afl_state数据结构体标识位
+例如:
+```c
+  if (afl->afl_env.afl_exit_on_time) {
 
+    u64 exit_on_time = atoi(afl->afl_env.afl_exit_on_time);
+    afl->exit_on_time = (u64)exit_on_time * 1000;
 
-
+  }
+```
+然后是分配一系列缓冲区
+```c
+  OKF("Generating fuzz data with a length of min=%u max=%u", afl->min_length,
+      afl->max_length);
+  u32 min_alloc = MAX(64U, afl->min_length);
+  afl_realloc(AFL_BUF_PARAM(in_scratch), min_alloc);
+  afl_realloc(AFL_BUF_PARAM(in), min_alloc);
+  afl_realloc(AFL_BUF_PARAM(out_scratch), min_alloc);
+  afl_realloc(AFL_BUF_PARAM(out), min_alloc);
+  afl_realloc(AFL_BUF_PARAM(eff), min_alloc);
+  afl_realloc(AFL_BUF_PARAM(ex), min_alloc);
+```
 
 
 
