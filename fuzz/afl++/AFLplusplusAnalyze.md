@@ -1,17 +1,31 @@
 <!--toc:start-->
 - [afl-cc](#afl-cc)
 - [afl-fuzz](#afl-fuzz)
+    - [struct afl_state](#struct-aflstate)
+    - [struct afl_forkserver](#struct-aflforkserver)
   - [setup_signal_handlers()](#setupsignalhandlers)
   - [check_asan_opts](#checkasanopts)
   - [fix_up_sync](#fixupsync)
-  - [FAST(exponential)](#fastexponential)
-  - [COE(cut-off exponential)](#coecut-off-exponential)
-  - [LIN(linear)](#linlinear)
-  - [QUAD(quadratic)](#quadquadratic)
-  - [MMOPT(modified M0pt)](#mmoptmodified-m0pt)
-  - [RARE(rare edge focus)](#rarerare-edge-focus)
-  - [SEEK(seek)](#seekseek)
-  - [EXPLORE(exploration-based constant)](#exploreexploration-based-constant)
+  - [afl_realloc](#aflrealloc)
+  - [save_cmdline](#savecmdline)
+  - [check_if_tty](#checkiftty)
+  - [get_core_count](#getcorecount)
+  - [atexit](#atexit)
+  - [setup_dirs_fds](#setupdirsfds)
+  - [bind_to_free_cpu](#bindtofreecpu)
+  - [init_count_class16](#initcountclass16)
+  - [setup_custom_mutators](#setupcustommutators)
+    - [mutator library](#mutator-library)
+    - [python module](#python-module)
+  - [](#)
+- [FAST(exponential)](#fastexponential)
+- [COE(cut-off exponential)](#coecut-off-exponential)
+- [LIN(linear)](#linlinear)
+- [QUAD(quadratic)](#quadquadratic)
+- [MMOPT(modified M0pt)](#mmoptmodified-m0pt)
+- [RARE(rare edge focus)](#rarerare-edge-focus)
+- [SEEK(seek)](#seekseek)
+- [EXPLORE(exploration-based constant)](#exploreexploration-based-constant)
 <!--toc:end-->
 
 # afl-cc
@@ -88,8 +102,12 @@ int main(int argc, char **argv, char **envp) {
 我们平时采用的`afl-clang-fast`等编译指令,实际上都是对于该c代码所编译形成的elf的符号链接,而该elf则会根据你传递的第一个参数来进一步设置编译选项`argv[0]`
 
 # afl-fuzz 
+## core struct
 
-同样这里我们需要先简单看一下该afl-fuzz的c代码所涉及到的关键结构体`aflL`
+这里介绍两个重要的结构体
+
+### struct afl_state
+同样这里我们需要先简单看一下该afl-fuzz的c代码所涉及到的关键结构体`afl_state_t`
 ```c
 typedef struct afl_state {
 
@@ -303,7 +321,7 @@ typedef struct afl_state {
   u8 *clean_trace_custom;
   u8 *first_trace;
 
-  /*needed for afl_fuzz_one */
+  /* needed for afl_fuzz_one */
   // TODO: see which we can reuse
   u8 *out_buf;
 
@@ -375,6 +393,7 @@ typedef struct afl_state {
 } afl_state_t;
 ```
 
+### struct afl_forkserver
 然后就是`afl_forkserver_t`
 
 ```c
@@ -596,7 +615,7 @@ void rand_set_seed(afl_state_t *afl, s64 init_seed) {
 + M:set main sync ID
 + S:set secondary sync id
 + F:set foreign sync dir
-+ f:set target file, fsrv.out_file
++ f:设置目标fuzz文件, fsrv.out_file
 + x:set dictionary 
 + t:set timeout 
 + m:set mem limit, fsrv.mem_limit
@@ -702,17 +721,272 @@ enum {
   afl_realloc(AFL_BUF_PARAM(eff), min_alloc);
   afl_realloc(AFL_BUF_PARAM(ex), min_alloc);
 ```
+## afl_realloc
+该函数确保调用后 size > size_needed。否则它将重新分配buf
+```c
+  ...
+  u8 *out_buf;
+
+  u8 *out_scratch_buf;
+
+  u8 *eff_buf;
+
+  u8 *in_buf;
+
+  u8 *in_scratch_buf;
+
+  u8 *ex_buf;
+
+  u8 *testcase_buf, *splicecase_buf;
+  ...
+```
+## save_cmdline
+复制当前指令行
+```c
+...
+  buf = afl->orig_cmdline = ck_alloc(len);
+
+  for (i = 0; i < argc; ++i) {
+
+    u32 l = strlen(argv[i]);
+
+    if (!argv[i] || !buf) { FATAL("null deref detected"); }
+
+    memcpy(buf, argv[i], l);
+    buf += l;
+...
+```
+
+## check_if_tty
+检查是否在TTY上面,如果说设置了`afl_no_ui`环境变量,则设置相应afl的字段
+如果没有设置这个环境变量且检查是在tty上`ioctl(1, TIOCGWINSZ, &ws)`,则报错
+
+## get_core_count
+计算逻辑CPU核心的数量
+
+## atexit
+这里是注册当exit被调用时需要执行的函数`at_exit()`,这里函数主要是执行杀掉相关进程,通过共享内存ID回收共享内存等等
+
+## setup_dirs_fds
+创建output的相关目录
+和获取一些必要的文件fd,例如`afl->fsrv`的`/dev/null && /dev/urandom`
+
+## bind_to_free_cpu
+如果有对于CPU亲和性的要求那么执行该函数,
+该函数建立一个绑定指定核心的进程列表
+## init_count_class16
+```c
+u16 count_class_lookup16[65536];
+
+void init_count_class16(void) {
+
+  u32 b1, b2;
+
+  for (b1 = 0; b1 < 256; b1++) {
+
+    for (b2 = 0; b2 < 256; b2++) {
+
+      count_class_lookup16[(b1 << 8) + b2] =
+          (count_class_lookup8[b1] << 8) | count_class_lookup8[b2];
+
+    }
+
+  }
+
+}
+```
+这里是初始化了`count_class_lookup16`的一个全局数组,该数组定义在`afl-fuzz-bitmap.c`当中
+
+## setup_custom_mutators
+该函数负责获取`struct custom_mutator *mutator`
+### mutator library 
+
+首先尝试有没有变异库
+```c
+void setup_custom_mutators(afl_state_t *afl) {
+
+  /* Try mutator library first */
+  struct custom_mutator *mutator;
+  u8                    *fn = afl->afl_env.afl_custom_mutator_library;
+  u32                    prev_mutator_count = 0;
+
+  if (fn) {
+...
+      mutator = load_custom_mutator(afl, fn);
+      list_append(&afl->custom_mutator_list, mutator);
+...
+
+```
+如果有的话则从库中加载`afl_custom_init, afl_custom_fuzz, afl_custom_mtator`等符号,然后将地址传给mutator, 然后将其挂到`afl->custom_mutator_list`这个链表上面,然后相应计数+1
+
+
+### python module
+
+```c
+  /* Try Python module */
+#ifdef USE_PYTHON
+  u8 *module_name = afl->afl_env.afl_python_module;
+  ...
+    struct custom_mutator *m = load_custom_mutator_py(afl, module_name);
+    afl->custom_mutators_count++;
+    list_append(&afl->custom_mutator_list, m);
+  ...
+```
+
+然后尝试python模块, 如果获取到了模块名
+则我们同样需要新创建一个mutator,然后挂上相同链表
+
+## setup_cmdline_file
+缓存我们的指令还来重现我们的发现
+这里主要是将argv[i]以行的形式写入我们的`/out/default/cmdline`文件
+
+## check_binary
+检查目标二进制文件是否存在,然后检查他是否是一个shell脚本
+
+## write_setup_file
+写fuzzer_setup,这个文件也是位于`out/default`目录下
+这个文件打开的例子如下,
+```sh
+# environment variables:
+AFL_CUSTOM_INFO_PROGRAM=/home/fuzzing_libexif/install/bin/exif
+AFL_CUSTOM_INFO_PROGRAM_ARGV=@@
+AFL_CUSTOM_INFO_OUT=/home/fuzzing_libexif/out//default
+AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES=1
+AFL_TRY_AFFINITY=1
+AFL_SKIP_CPUFREQ=1
+# command line:
+'afl-fuzz' '-i' '/home/fuzzing_libexif/exif-samples-master/jpg/' '-o' '/home/fuzzing_libexif/out/' '-s' '123' '--' '/home/fuzzing_libexif/install/bin/exif' '@@'
+```
+## read_testcases
+从输入目录读取所有的测试用例, 然后将他们进行排队测试, 在开始时调用
+这里使用`scandir()+alphasort()`而不是`readdir()`的原因是后者可能造成测试样例顺序的紊乱导致难以控制
+
+首先是扫描`in_dir/queue`目录是否存在,如果不存在则仅仅扫描 `indir`
+然后开始扫描输入目录,这里`scandir`搭配的`alphasort`是一个排序函数,用来按照字母顺序来存放目录项
+
+其中的&nl是一个指向 `struct dirent **` 类型的指针的地址。`scandir`函数会分配内存并填充这个指针，指向一个包含目录项的结构体数组。每个结构体代表一个文件或子目录。
+
+## add_to_queue
+将新的测试样例添加到队列,每个队列元素为`struct queue_entry`
+### struct queue_entry
+```c
+struct queue_entry {
+
+  u8 *fname;                            /* 测试样例的文件名      */
+  u32 len;                              /* 输入长度 */
+  u32 id;                               /* entry number in queue_buf        */
+
+  u8 colorized,                         /* Do not run redqueen stage again  */
+      cal_failed;                       /* Calibration failed?              */
+
+  bool trim_done,                       /* Trimmed?                         */
+      was_fuzzed,                       /* historical, but needed for MOpt  */
+      passed_det,                       /* 确定性阶段已过?     */
+      has_new_cov,                      /* Triggers new coverage?           */
+      var_behavior,                     /* Variable behavior?               */
+      favored,                          /* Currently favored?               */
+      fs_redundant,                     /* Marked as redundant in the fs?   */
+      is_ascii,                         /* Is the input just ascii text?    */
+      disabled;                         /* Is disabled from fuzz selection  */
+
+  u32 bitmap_size,                      /* Number of bits set in bitmap     */
+#ifdef INTROSPECTION
+      stats_selected,                   /* stats: how often selected        */
+      stats_skipped,                    /* stats: how often skipped         */
+      stats_finds,                      /* stats: # of saved finds          */
+      stats_crashes,                    /* stats: # of saved crashes        */
+      stats_tmouts,                     /* stats: # of saved timeouts       */
+#endif
+      fuzz_level,                       /* Number of fuzzing iterations     */
+      n_fuzz_entry;                     /* offset in n_fuzz                 */
+
+  u64 exec_us,                          /* Execution time (us)              */
+      handicap,                         /* Number of queue cycles behind    */
+      depth,                            /* 路径深度                       */
+      exec_cksum,                       /* Checksum of the execution trace  */
+      custom,                           /* Marker for custom mutators       */
+      stats_mutated;                    /* stats: # of mutations performed  */
+
+  u32 tc_ref;                           /* Trace bytes ref count            */
+
+#ifdef INTROSPECTION
+  u32 bitsmap_size;
+#endif
+
+  double perf_score,                    /*  表现得分             */
+      weight;
+
+  struct queue_entry *mother;            /* queue entry this based on        */
+  u8                 *trace_mini;        /* Trace bytes, if kept             */
+  u8                 *testcase_buf;      /* The testcase buffer, if loaded.  */
+  u8                 *cmplog_colorinput; /* the result buf of colorization   */
+  struct tainted     *taint;             /* Taint information from CmpLog    */
+  struct skipdet_entry *skipdet_e;
+
+};
+
+```
+1. 这里首先会初始化一些`queue_entry`的字段,其中`weight`权重设置为1, `perf_score`设置为100等等
+2. 查看该entry的`depth`是否大于最大深度,如果大于就更新这个`max_depth`
+3. 查看queue_top,若存在则更新插入的这个,否则`afl->queue`和`afl->queue_top`也被赋值为q
+4. afl相关的一些字段自增,`queued_items,active_items, pending_not_fuzzed`
+5. 扩充一个存放`queue_entry`地址的数组,这个数组被记录在`afl->queue_buf`,数组个数取决于`afl->queued_items`,然后将q记录在末尾,并将q->id记录为index
+
+
+## pivot_inputs
+在输出目录中创建输入测试用例的硬链接，选择好名字并相应地调整
+
+## setup_stdio_file
+为了被fuzz的数据建立output文件,如果没使用-f的话,创建`tmp_dir/.cur_input`文件,将其作为`fsrv.out_file`
+
+## setup_testcase_shmem
+建立共享映射,使用共享内存来进行输入来进行fuzz
+```c
+void setup_testcase_shmem(afl_state_t *afl) {
+
+  afl->shm_fuzz = ck_alloc(sizeof(sharedmem_t));
+
+  // we need to set the non-instrumented mode to not overwrite the SHM_ENV_VAR
+  u8 *map = afl_shm_init(afl->shm_fuzz, MAX_FILE + sizeof(u32), 1);
+  afl->shm_fuzz->shmemfuzz_mode = 1;
+
+  if (!map) { FATAL("BUG: Zero return from afl_shm_init."); }
+
+#ifdef USEMMAP
+  setenv(SHM_FUZZ_ENV_VAR, afl->shm_fuzz->g_shm_file_path, 1);
+#else
+  u8 *shm_str = alloc_printf("%d", afl->shm_fuzz->shm_id);
+  setenv(SHM_FUZZ_ENV_VAR, shm_str, 1);
+  ck_free(shm_str);
+#endif
+  afl->fsrv.support_shmem_fuzz = 1;
+  afl->fsrv.shmem_fuzz_len = (u32 *)map;
+  afl->fsrv.shmem_fuzz = map + sizeof(u32);
+
+}
+```
+## load_auto
+加载自动生成的extras
+
+
+这个函数是设置fsrv的一些共享内存相关字段
+## afl_shm_init
+这个函数用来配置共享内存, 返回`shm->map`,这里新创建的shmem会链接到全局的`shm_list`当中
+```c
+/* afl-sharedmem.c */
+static list_t shm_list = {.element_prealloc_count = 0};
+```
 
 
 
-## FAST(exponential)
-## COE(cut-off exponential)
-## LIN(linear)
-## QUAD(quadratic)
-## MMOPT(modified M0pt)
-## RARE(rare edge focus)
-## SEEK(seek)
-## EXPLORE(exploration-based constant)
+# FAST(exponential)
+# COE(cut-off exponential)
+# LIN(linear)
+# QUAD(quadratic)
+# MMOPT(modified M0pt)
+# RARE(rare edge focus)
+# SEEK(seek)
+# EXPLORE(exploration-based constant)
 
 
 
