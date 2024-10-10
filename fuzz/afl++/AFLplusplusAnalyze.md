@@ -1,6 +1,7 @@
 <!--toc:start-->
 - [afl-cc](#afl-cc)
 - [afl-fuzz](#afl-fuzz)
+  - [core struct](#core-struct)
     - [struct afl_state](#struct-aflstate)
     - [struct afl_forkserver](#struct-aflforkserver)
   - [setup_signal_handlers()](#setupsignalhandlers)
@@ -17,7 +18,16 @@
   - [setup_custom_mutators](#setupcustommutators)
     - [mutator library](#mutator-library)
     - [python module](#python-module)
-  - [](#)
+  - [setup_cmdline_file](#setupcmdlinefile)
+  - [check_binary](#checkbinary)
+  - [write_setup_file](#writesetupfile)
+  - [read_testcases](#readtestcases)
+  - [add_to_queue](#addtoqueue)
+    - [struct queue_entry](#struct-queueentry)
+  - [pivot_inputs](#pivotinputs)
+  - [setup_stdio_file](#setupstdiofile)
+  - [setup_testcase_shmem](#setuptestcaseshmem)
+  - [afl_shm_init](#aflshminit)
 - [FAST(exponential)](#fastexponential)
 - [COE(cut-off exponential)](#coecut-off-exponential)
 - [LIN(linear)](#linlinear)
@@ -874,19 +884,19 @@ struct queue_entry {
 
   u8 *fname;                            /* 测试样例的文件名      */
   u32 len;                              /* 输入长度 */
-  u32 id;                               /* entry number in queue_buf        */
+  u32 id;                               /* 在queue_buf中的index    */
 
   u8 colorized,                         /* Do not run redqueen stage again  */
-      cal_failed;                       /* Calibration failed?              */
+      cal_failed;                       /* 校准是否失败      */
 
-  bool trim_done,                       /* Trimmed?                         */
+  bool trim_done,                       /* 是否被修剪         */
       was_fuzzed,                       /* historical, but needed for MOpt  */
       passed_det,                       /* 确定性阶段已过?     */
-      has_new_cov,                      /* Triggers new coverage?           */
-      var_behavior,                     /* Variable behavior?               */
-      favored,                          /* Currently favored?               */
+      has_new_cov,                      /* 是否出发新的覆盖率 */
+      var_behavior,                     /* Variable behavior?      */
+      favored,                          /* 现在是否被喜爱       */
       fs_redundant,                     /* Marked as redundant in the fs?   */
-      is_ascii,                         /* Is the input just ascii text?    */
+      is_ascii,                         /* 输入是否仅为ASCII文本   */
       disabled;                         /* Is disabled from fuzz selection  */
 
   u32 bitmap_size,                      /* Number of bits set in bitmap     */
@@ -900,7 +910,7 @@ struct queue_entry {
       fuzz_level,                       /* Number of fuzzing iterations     */
       n_fuzz_entry;                     /* offset in n_fuzz                 */
 
-  u64 exec_us,                          /* Execution time (us)              */
+  u64 exec_us,                          /* 执行时间(us)         */
       handicap,                         /* Number of queue cycles behind    */
       depth,                            /* 路径深度                       */
       exec_cksum,                       /* Checksum of the execution trace  */
@@ -917,8 +927,8 @@ struct queue_entry {
       weight;
 
   struct queue_entry *mother;            /* queue entry this based on        */
-  u8                 *trace_mini;        /* Trace bytes, if kept             */
-  u8                 *testcase_buf;      /* The testcase buffer, if loaded.  */
+  u8                 *trace_mini;        /* 追踪的字节            */
+  u8                 *testcase_buf;      /* 测试样例的缓冲区if loaded.  */
   u8                 *cmplog_colorinput; /* the result buf of colorization   */
   struct tainted     *taint;             /* Taint information from CmpLog    */
   struct skipdet_entry *skipdet_e;
@@ -965,16 +975,215 @@ void setup_testcase_shmem(afl_state_t *afl) {
 
 }
 ```
-## load_auto
-加载自动生成的extras
-
-
 这个函数是设置fsrv的一些共享内存相关字段
+
+
 ## afl_shm_init
 这个函数用来配置共享内存, 返回`shm->map`,这里新创建的shmem会链接到全局的`shm_list`当中
 ```c
 /* afl-sharedmem.c */
 static list_t shm_list = {.element_prealloc_count = 0};
+```
+
+## afl_fsrv_start
+启动fork服务器
+这里构造了两个pipe`st_pipe, ctl_pipe`, 然后fork一个子进程作为`fork server`
+
+下面是child_process代码
+```c
+  if (!fsrv->fsrv_pid) {
+
+    /* 子进程 */
+
+    // enable terminating on sigpipe in the childs
+    struct sigaction sa;
+    memset((char *)&sa, 0, sizeof(sa));
+    sa.sa_handler = SIG_DFL;
+    sigaction(SIGPIPE, &sa, NULL);
+
+      /* 用于限制被fuzz程序消耗的资源 */
+    struct rlimit r;
+
+      /* 资源限制设置 */
+    ....
+    /* 隔离进程并配置标准描述符。如果指定了out_file，则stdin为/dev/null；否则，将克隆 out_fd
+    Isolate the process and configure standard descriptors. If out_file is
+       specified, stdin is /dev/null; otherwise, out_fd is cloned instead. */
+
+    setsid();
+
+    if (!(debug_child_output)) {
+
+      dup2(fsrv->dev_null_fd, 1);
+      dup2(fsrv->dev_null_fd, 2);
+
+    }
+
+    if (!fsrv->use_stdin) {
+
+      dup2(fsrv->dev_null_fd, 0);
+
+    } else {
+
+      dup2(fsrv->out_fd, 0);
+      close(fsrv->out_fd);
+
+    }
+
+    /* Set up control and status pipes, close the unneeded original fds. */
+
+    if (dup2(ctl_pipe[0], FORKSRV_FD) < 0) { PFATAL("dup2() failed"); }
+    if (dup2(st_pipe[1], FORKSRV_FD + 1) < 0) { PFATAL("dup2() failed"); }
+
+    close(ctl_pipe[0]);
+    close(ctl_pipe[1]);
+    close(st_pipe[0]);
+    close(st_pipe[1]);
+
+    close(fsrv->out_dir_fd);
+    close(fsrv->dev_null_fd);
+    close(fsrv->dev_urandom_fd);
+
+    if (fsrv->plot_file != NULL) {
+
+      fclose(fsrv->plot_file);
+      fsrv->plot_file = NULL;
+
+    }
+
+    /* This should improve performance a bit, since it stops the linker from
+       doing extra work post-fork(). */
+
+    if (!getenv("LD_BIND_LAZY")) { setenv("LD_BIND_NOW", "1", 1); }
+
+    /* Set sane defaults for sanitizers */
+    set_sanitizer_defaults();
+
+    fsrv->init_child_func(fsrv, argv);
+
+    /* Use a distinctive bitmap signature to tell the parent about execv()
+       falling through. */
+
+    *(u32 *)fsrv->trace_bits = EXEC_FAIL_SIG;
+    FATAL("Error: execv to target failed\n");
+
+  }
+```
+
+
+
+
+
+## load_auto
+
+加载自动生成的extras
+这里的`extras`指的是确定性的注入词典术语,可以显示为`用户`或者`自动
+
+## deunicode_extras
+有时输入中的字符串会在内部转换为 unicode，因此对于模糊测试，如果它看起来像简单的 unicode，我们应该尝试去 解码unicode
+
+## dedup_extras
+从加载到的extras中移除复制部分, 这里能够在多个文件被加载时发生
+
+## perform_dry_run
+对所有测试用例执行试运行，以确认应用程序按预期工作。这仅针对初始输入执行，并且仅执行一次
+
+1. for循环读取每个`queue_entry`
+2. 打开`queue_entry`对应的文件
+3. 将文件内容拷贝到`afl->use_mem`当中
+
+
+
+## calibrate_case
+校准新的测试用例。这是在处理输入目录以尽早警告不稳定或其他有问题的测试用例时完成的；当发现新路径来检测可变行为时等等
+
+1. 设置`afl->stage_name = "calibration";`
+2. 
+
+
+## cull_queue
+该函数遍历 `afl->top_erated[]` 条目，然后顺序抓取以前未见过的字节 (temp_v) 的获胜者，并将它们标记为受欢迎的，至少直到下一次运行。在所有模糊测试步骤中，受欢迎的条目会获得更多的执行步骤
+
+
+```c
+void cull_queue(afl_state_t *afl) {
+
+    /* 如果afl发现score未改变或者说是非插桩模式,则直接返回 */
+  if (likely(!afl->score_changed || afl->non_instrumented_mode)) { return; }
+
+    /* map_size右移三位也就是➗8获取字节 */
+  u32 len = (afl->fsrv.map_size >> 3);
+  u32 i;
+    /* 获取afl的map_tmp_buf */
+  u8 *temp_v = afl->map_tmp_buf;
+
+    /* 分数改变清空 */
+  afl->score_changed = 0;
+
+   /* 清空temp_v数组 */
+  memset(temp_v, 255, len);
+
+  afl->queued_favored = 0;
+  afl->pending_favored = 0;
+
+    /* 初始化 */
+  for (i = 0; i < afl->queued_items; i++) {
+
+    afl->queue_buf[i]->favored = 0;
+
+  }
+....
+```
+上面的部分对队列进行了一系列标识符的初始化
+
+```c
+  /* Let's see if anything in the bitmap isn't captured in temp_v.
+     If yes, and if it has a afl->top_rated[] contender, let's use it. */
+
+  afl->smallest_favored = -1;
+
+  /* 按照bit位来遍历 */
+  for (i = 0; i < afl->fsrv.map_size; ++i) {
+
+    if (afl->top_rated[i] && (temp_v[i >> 3] & (1 << (i & 7))) &&
+        afl->top_rated[i]->trace_mini) {
+
+      u32 j = len;
+
+      /* Remove all bits belonging to the current entry from temp_v. */
+
+      while (j--) {
+
+        if (afl->top_rated[i]->trace_mini[j]) {
+
+          temp_v[j] &= ~afl->top_rated[i]->trace_mini[j];
+
+        }
+
+      }
+
+      if (!afl->top_rated[i]->favored) {
+
+        afl->top_rated[i]->favored = 1;
+        ++afl->queued_favored;
+
+        if (!afl->top_rated[i]->was_fuzzed) {
+
+          ++afl->pending_favored;
+          if (unlikely(afl->smallest_favored < 0)) {
+
+            afl->smallest_favored = (s64)afl->top_rated[i]->id;
+
+          }
+
+        }
+
+      }
+
+    }
+
+  }
+
 ```
 
 

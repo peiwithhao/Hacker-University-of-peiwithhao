@@ -244,6 +244,10 @@ virtual bool doFinalzation(CallGraph &CG) = 0;
 # \%. LLVM Pass 编写 
 首先下载github的库:
 
+
+
+
+
 # ((.引用
 [LLVM-CORE](https://getting-started-with-llvm-core-libraries-zh-cn.readthedocs.io/zh-cn/latest/ch05.html)
 [Value API](https://llvm.org/doxygen/classllvm_1_1Value.html)
