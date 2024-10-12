@@ -245,9 +245,30 @@ virtual bool doFinalzation(CallGraph &CG) = 0;
 首先下载github的库:
 
 
+# 编译Linux内核
+实际上只需要使用
+```sh
+$ make LLVM=1 -j<your cores_nr>
+```
+就可以正常编译
 
+而如果我们想要获取LLVM IR的话需要一些额外操作
+这里使用wllvm来作为提取工具
 
+具体步骤如下,首先导出一个环境变量
+```sh
+$ export LLVM_COMPILER=clang
+```
+然后我们进入到下载到的linux源码目录
+```c
+make CC=clang defconfig # 默认配置
+make CC=wllvm LLVM=1 #开始编译
+```
 
 # ((.引用
 [LLVM-CORE](https://getting-started-with-llvm-core-libraries-zh-cn.readthedocs.io/zh-cn/latest/ch05.html)
 [Value API](https://llvm.org/doxygen/classllvm_1_1Value.html)
+[使用LLVM编译Linux内核](https://www.kernel.org/doc/html/latest/kbuild/llvm.html)
+[llvm_bc不生成的解决方案](https://blog.csdn.net/ckugua/article/details/129502143)
+
+

@@ -659,6 +659,3 @@ $ wf-recorder --audio -o file_name -g "$(slurp)"
 
 
 
-
-
-

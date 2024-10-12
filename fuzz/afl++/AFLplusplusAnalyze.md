@@ -579,7 +579,14 @@ int main(int argc, char **argv_orig, char **envp) {
   afl->shmem_testcase_mode = 1;  // we always try to perform shmem fuzzing
 ....
 ```
+
+## afl_fsrv_init
+初始化了一些`afl->fsrv`的参数以及其子进程处理函数
+
+
 截至目前是完成了初始种子的赋值,对于种子的设置可以查看下面内容
+
+
 ```c
 void rand_set_seed(afl_state_t *afl, s64 init_seed) {
 
@@ -989,6 +996,8 @@ static list_t shm_list = {.element_prealloc_count = 0};
 启动fork服务器
 这里构造了两个pipe`st_pipe, ctl_pipe`, 然后fork一个子进程作为`fork server`
 
+### CHILD PROCESS
+
 下面是child_process代码
 ```c
   if (!fsrv->fsrv_pid) {
@@ -1014,23 +1023,25 @@ static list_t shm_list = {.element_prealloc_count = 0};
 
     if (!(debug_child_output)) {
 
+          /* 这里将任何对于stdout和stderr的输出都会重定位到dev_null设备中 */
       dup2(fsrv->dev_null_fd, 1);
       dup2(fsrv->dev_null_fd, 2);
 
     }
-
+/* 如果不使用stdin */
     if (!fsrv->use_stdin) {
-
+/* 任何从stdin输入将会从dev_null读入 */
       dup2(fsrv->dev_null_fd, 0);
 
     } else {
 
+          /* 将服务器的输入改编为out_fd所指向的文件 */
       dup2(fsrv->out_fd, 0);
       close(fsrv->out_fd);
 
     }
 
-    /* Set up control and status pipes, close the unneeded original fds. */
+      /* 设置控制和状态pipe, 关闭不需要的原始fd */
 
     if (dup2(ctl_pipe[0], FORKSRV_FD) < 0) { PFATAL("dup2() failed"); }
     if (dup2(st_pipe[1], FORKSRV_FD + 1) < 0) { PFATAL("dup2() failed"); }
@@ -1051,12 +1062,10 @@ static list_t shm_list = {.element_prealloc_count = 0};
 
     }
 
-    /* This should improve performance a bit, since it stops the linker from
-       doing extra work post-fork(). */
-
-    if (!getenv("LD_BIND_LAZY")) { setenv("LD_BIND_NOW", "1", 1); }
+      ...
 
     /* Set sane defaults for sanitizers */
+      /* 通过服务器的环境变量来设置子进程自身的sanitizers */
     set_sanitizer_defaults();
 
     fsrv->init_child_func(fsrv, argv);
@@ -1069,9 +1078,36 @@ static list_t shm_list = {.element_prealloc_count = 0};
 
   }
 ```
+这里子进程所作的事情如下
+1. 对于自身资源的消耗做出了控制
+2. 然后隔离了自身进程并修改了一些标准描述符,隔离进程并配置标准描述符。如果指定了out_file，则stdin为/dev/null；否则，将克隆 out_fd。
+3. 然后设置自身的`control_pipe`和`status_pipe`, 其中只保留了`ctl_pipe`的读和`st_pipe`的写, 然后分别将其fd重定位到`FORKSRV_FD, FORKSRV_FD+1`
+4. 关闭多余的fd并设置`sanitizer`
+5. 执行二进制函数, 这里`fsrv->init_child_func`被指向为`fsrv_exec_child`,这里的赋值是由`afl_fsrv_init`函数来做的
 
+### fsrv_exec_child
+```c
+static void fsrv_exec_child(afl_forkserver_t *fsrv, char **argv) {
 
+  if (fsrv->qemu_mode || fsrv->cs_mode) {
 
+    setenv("AFL_DISABLE_LLVM_INSTRUMENTATION", "1", 0);
+
+  }
+
+  execv(fsrv->target_path, argv);
+
+  WARNF("Execv failed in forkserver.");
+
+}
+```
+这里是子进程执行`targer_path`路径所代表的程序,作为服务器来运行,值得注意的是经过调试这里的`target_path`就是我们被fuzz的程序,但是在运行之时他的功能为一个fuzz服务器,跟进调试发现他在运行`instrumentation/`目录下一个c程序的代码,应该是我们初步`afl-cc`的时候进行插桩导致的
+
+### PARENT PROCESS
+1. 首先打印子进程pid
+2. 关闭多于的fd,这里只保留`ctl_pipe`的写和`st_pipe`的读
+3. 等待fork服务器的启动,不会耗费太多时间
+4. 尝试从`st_fd`读取四字节信息来获知服务器已经启动
 
 
 ## load_auto
@@ -1102,6 +1138,7 @@ static list_t shm_list = {.element_prealloc_count = 0};
 
 
 ## cull_queue
+
 该函数遍历 `afl->top_erated[]` 条目，然后顺序抓取以前未见过的字节 (temp_v) 的获胜者，并将它们标记为受欢迎的，至少直到下一次运行。在所有模糊测试步骤中，受欢迎的条目会获得更多的执行步骤
 
 
@@ -1126,9 +1163,7 @@ void cull_queue(afl_state_t *afl) {
   afl->queued_favored = 0;
   afl->pending_favored = 0;
 
-    /* 初始化 */
-  for (i = 0; i < afl->queued_items; i++) {
-
+    /* 初始化 */ for (i = 0; i < afl->queued_items; i++) {
     afl->queue_buf[i]->favored = 0;
 
   }
