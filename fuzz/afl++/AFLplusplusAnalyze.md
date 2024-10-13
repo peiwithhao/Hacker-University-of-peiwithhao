@@ -1133,8 +1133,66 @@ static void fsrv_exec_child(afl_forkserver_t *fsrv, char **argv) {
 ## calibrate_case
 校准新的测试用例。这是在处理输入目录以尽早警告不稳定或其他有问题的测试用例时完成的；当发现新路径来检测可变行为时等等
 
-1. 设置`afl->stage_name = "calibration";`
-2. 
+1. 如果校准的entry不是来自queue或者现在是恢复fuzz会话,那么超时时间将增加一部分,这样有助于避免间歇性延迟而产生的问题
+2. 设置`afl->stage_name = "calibration";`, `q->cal_failed++`
+3. 设置`afl->stage_max`, 通过环境变量是否有`afl_env.afl_cal_fast`来决定,这里的主要含义是每个测试用例测试的最大数量,`CAL_CYCLES_FAST=3, CAL_CYCLES=7`
+3. 确保forkserver是开启状态
+4. 检查`q->exec_cksum`,如果该值不为0则表示其不是来自input文件夹, 将`fsrv.trace_bits`复制到`afl->first_trace`当中,然后调用`has_new_bits`来检查是否有`virgin`位图改变
+5. 获取当前时间,遍历`afl->stage_max`次来进行检测
+6. 调用`write_to_testcase`
+
+
+## has_new_bits
+检查当前执行路径是否给表带来了任何新内容。更新原始位以反映发现。
++ 如果唯一的变化是特定元组的命中计数，则返回 1； 
++ 如果有新的元组出现则返回2。
++ 更新地图，因此后续调用将始终返回 0。
++ 该函数在相当大的缓冲区上的每次 exec() 之后调用，因此它需要很快。我们在 32 位和 64 位版本中执行此操作
+
+这里有两个位图, 一个是`afl.fsrv->trace_bits`,还有一个是`afl->virgin_map`
+1. 获取真实位图的字节大小
+2. 每字节按位比较两个位图,调用`discover_word`,来发现是否有发现新路径,如果有则更新`virgin_map`
+3. 如果传入的参数`virgin_map == afl->virgin_bits`则将`afl->bitmap_changed = 1`, 然后返回修改
+
+注意`virgin_map`保存的是没有被覆盖的基本快,初始为全1
+
+
+## discover_word
+```c
+inline void discover_word(u8 *ret, u64 *current, u64 *virgin) {
+
+    /* 检查current和virgin都非空 */
+  if (*current & *virgin) {
+
+        /* 初始调用时ret为0, 根据上一次的discover来判断 */
+    if (likely(*ret < 2)) {
+
+      u8 *cur = (u8 *)current;
+      u8 *vir = (u8 *)virgin;
+
+      /* Looks like we have not found any new bytes yet; see if any non-zero
+         bytes in current[] are pristine in virgin[]. */
+            /* 这里注意==的优先级高于&&,意思为如果cur[0]不为全0并且vir[0]是初始化状态 */
+
+      if ((cur[0] && vir[0] == 0xff) || (cur[1] && vir[1] == 0xff) ||
+          (cur[2] && vir[2] == 0xff) || (cur[3] && vir[3] == 0xff) ||
+          (cur[4] && vir[4] == 0xff) || (cur[5] && vir[5] == 0xff) ||
+          (cur[6] && vir[6] == 0xff) || (cur[7] && vir[7] == 0xff))
+        *ret = 2;
+      else
+        *ret = 1;
+
+    }
+
+    *virgin &= ~*current;
+
+  }
+
+}
+```
+
+整个函数的目的是寻找是否存在在`virgin_map`为初始化的某个比特位,`current_map`有了新的发现,如果有则更新`virgin_map`
+
 
 
 ## cull_queue
@@ -1151,7 +1209,7 @@ void cull_queue(afl_state_t *afl) {
     /* map_size右移三位也就是➗8获取字节 */
   u32 len = (afl->fsrv.map_size >> 3);
   u32 i;
-    /* 获取afl的map_tmp_buf */
+    /* 获取afl的map_tmp_buf, 这是大小为map_size的固定缓冲区,任何函数都可以使用 */
   u8 *temp_v = afl->map_tmp_buf;
 
     /* 分数改变清空 */
@@ -1180,12 +1238,15 @@ void cull_queue(afl_state_t *afl) {
   /* 按照bit位来遍历 */
   for (i = 0; i < afl->fsrv.map_size; ++i) {
 
+      /* 这里的top_entries是bitmap bytes中的排名较高的entries */
+      /* trace_mini 是追踪字节 */
     if (afl->top_rated[i] && (temp_v[i >> 3] & (1 << (i & 7))) &&
         afl->top_rated[i]->trace_mini) {
 
       u32 j = len;
 
       /* Remove all bits belonging to the current entry from temp_v. */
+          /* 从temp_v中移除隶属于当前entry的比特位 */
 
       while (j--) {
 
