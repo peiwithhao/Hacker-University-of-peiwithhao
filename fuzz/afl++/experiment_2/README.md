@@ -30,7 +30,7 @@ make install
 ## 编译exif
 我们需要寻找到使用该lib库API的程序,于是便找到exif
 ```c
-cd exif-exif-0_6_15-release/
+cd exif-exif-0_6_14-release/
 autoreconf -fvi
 ./configure --enable-shared=no --prefix="$HOME/fuzzing_libexif/install/" PKG_CONFIG_PATH=$HOME/fuzzing_libexif/install/lib/pkgconfig
 make
@@ -117,7 +117,6 @@ afl-fuzz -i $HOME/fuzzing_libexif/exif-samples-master/jpg/ -o $HOME/fuzzing_libe
 
 这里发现在exif_get_short这个函数出现了越界访问,我们重启进程在exif_data_load_data中可以看到
 
-
 ```c
 void
 exif_data_load_data (ExifData *data, const unsigned char *d_orig,
@@ -129,5 +128,18 @@ exif_data_load_data (ExifData *data, const unsigned char *d_orig,
         n = exif_get_short (d + 6 + offset, data->priv->order);
 ...
 ```
+可以看到是这里`offset+d+6`的参数本应该是一个地址,但是这里offset经过调试发现为负1
+而ds调试过程中为一个较大的无符号数0x484, 因此一个无符号数0xffff+6+2是小于ds的因此通过检查
+然后在`exif_get_short`中造成越界
+,因此这里就造成了越界异常,而这个漏洞已经被记录为`CVE-2012-2836`
 
-这里的offset经过漏洞样本的调试发现为一个负数,这样可以越过上面的检查,而在这里`exif_get_short`的第一个参数为地址,因此这里就造成了越界异常,而这个漏洞已经被记录为`CVE-2012-2836`
+而这个漏洞的解决方式是在上面判断是多加一个判断
+```c
+...
+ if (offset > ds || offset + 6 + 2 > ds) {
+                return;
+        }
+...
+```
+
+

@@ -1139,7 +1139,16 @@ static void fsrv_exec_child(afl_forkserver_t *fsrv, char **argv) {
 3. 确保forkserver是开启状态
 4. 检查`q->exec_cksum`,如果该值不为0则表示其不是来自input文件夹, 将`fsrv.trace_bits`复制到`afl->first_trace`当中,然后调用`has_new_bits`来检查是否有`virgin`位图改变
 5. 获取当前时间,遍历`afl->stage_max`次来进行检测
-6. 调用`write_to_testcase`
+    1. 调用`write_to_testcase`,将读取的测试内容写入`fsrv->shmem_fuzz`中
+    2. 调用`fuzz_run_target`,这个函数实际上是`afl_fsrv_run_target`的wrapper
+    3. 更新校验时间
+    4. 调用`classify_counts`,将执行次数规整化(1->1, 2->2, 3->4, 4->4),都使用一个bytes来表示
+    5. 计算`fsrv.trace_bits`的hash值,然后同exec_cksum进行比较, 如果不相同则更新`virgin_bits`
+    6. 如果`exec_cksum`为0,说明该entry是input目录下构成的,则将`afl->exec_cksum = cksum`, 再将`trace_bits`拷贝到`afl->first_trace`中
+    7. 如果`exec_cksum`不为0, 则说明他不是来自input目录,然后判断他是否是可变entry,从0到`map_size`开始遍历,如果发现当前字节`var_bytes[i]`为0, 且`first_trace[i] != trace_bits[i]`,则`将var_byts[i]`置1, 且`virgin_bits[i] = 0`用来表示标志他为完全发现,然后最后设置`var_detected = 1`用来表示检测到可变entry, 此时将`stage_max`增加一部分,最多12
+6. 设置相关时间
+7. 更新位图分数
+7. 如果发现检测到可变路径, 
 
 
 ## has_new_bits
@@ -1155,6 +1164,26 @@ static void fsrv_exec_child(afl_forkserver_t *fsrv, char **argv) {
 3. 如果传入的参数`virgin_map == afl->virgin_bits`则将`afl->bitmap_changed = 1`, 然后返回修改
 
 注意`virgin_map`保存的是没有被覆盖的基本快,初始为全1
+
+## write_to_testcase
+主要是将之前测试用例的`use_mem`写入到`afl.fsrv->shmem_fuzz`当中
+
+## count_bytes
+计算给定的位图中有多少字节有置位
+
+## update_bitmap_score
+当我们遇到一条新路径时，我们称其为查看该路径是否比任何现有路径更有利。 “有利条件”的目的是拥有一组最小的路径来触发迄今为止在位图中看到的所有位，并专注于对它们进行模糊测试，而牺牲其余部分。
+   该过程的第一步是维护位图中每个字节的`afl->top_erated[]`  条目列表。如果没有先前的竞争者，或者竞争者具有更有利的速度 x 尺寸系数，我们将赢得该位置
+
+进行for循环判断位图每个字节
+1. 判断调度器类型
+2. 使用`q->exec_us * q->len`来作为评价标准
+3. 如果`trace_bits[i]`不为0,则说明该路径已经被覆盖到, 进行下一步
+4. 然后判断对应该path的`top_rated[i]`是否存在,如果存在,则同样计算`top_rated[i]`的评价标准,然后与`trace_bits[i]`的评价标准作比较,如果发现并没有优化,则进行下一字节的判断,返回步骤1,否则继续
+5. 将`top_rated[i]->tc_ref--`,如果这个计数为0, 则释放掉`top_rated[i]->trace_mini`
+6. 到这里说明`trace_bit[i]`更优, 则将`top_rated[i] = q`,然后增加q的计数,如果`q->trace_mini`为空,则重新分配字节, 然后将`q->trace_bits`压缩存储到其中,也就是说原本的可以标注path执行次数的`trace_bits`变作只记录是否访问到的`trace_mini`
+7. 将`afl->score_changed = 1`
+
 
 
 ## discover_word
@@ -1192,6 +1221,24 @@ inline void discover_word(u8 *ret, u64 *current, u64 *virgin) {
 ```
 
 整个函数的目的是寻找是否存在在`virgin_map`为初始化的某个比特位,`current_map`有了新的发现,如果有则更新`virgin_map`
+
+## afl_fsrv_run_target
+执行目标进程,检测是否超时, 返回状态信息,他是`afl_fsrv_run_target`的一层wrapper
+1. 如果不是`nyx_mode`,则设置`fsrv->trace_bits`为0
+2. 向`fsrv_ctl_fd`写入控制字段,告诉`fork server`上次运行是否超时
+3. 设置`fsrv->last_run_timed_out = 0` 
+4. 从`fsrv_st_fd`读取fork子进程的pid
+5. 在一定的超时范围内读取fork子进程的状态
+6. 如果发现超时,则杀掉fork子进程,然后设置上次超时标志位
+7. `fsrv->total_execs++`,这个标志位是记录了`run_target`被使用了多少次
+8. 然后这里存在一个内存屏障用来保存对于`fsrv->trace_bits`的操作都在这之下
+9. 进行一些相关的检查,例如是否执行失败,是否运行超时
+10. 查看是否crash, 处理crash
+11. 否则返回执行正确
+
+
+
+
 
 
 
@@ -1285,13 +1332,22 @@ void cull_queue(afl_state_t *afl) {
 
 
 # FAST(exponential)
+指数
 # COE(cut-off exponential)
+截止指数
 # LIN(linear)
+线性
 # QUAD(quadratic)
+二次
 # MMOPT(modified M0pt)
+修改后的M0pt优化
 # RARE(rare edge focus)
+罕见的边缘焦点
 # SEEK(seek)
+寻找
 # EXPLORE(exploration-based constant)
+基于探索的常数
+
 
 
 
