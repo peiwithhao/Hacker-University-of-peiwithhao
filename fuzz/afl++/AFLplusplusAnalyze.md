@@ -1148,7 +1148,7 @@ static void fsrv_exec_child(afl_forkserver_t *fsrv, char **argv) {
     7. 如果`exec_cksum`不为0, 则说明他不是来自input目录,然后判断他是否是可变entry,从0到`map_size`开始遍历,如果发现当前字节`var_bytes[i]`为0, 且`first_trace[i] != trace_bits[i]`,则`将var_byts[i]`置1, 且`virgin_bits[i] = 0`用来表示标志他为完全发现,然后最后设置`var_detected = 1`用来表示检测到可变entry, 此时将`stage_max`增加一部分,最多12
 6. 设置相关时间
 7. 更新位图分数
-7. 如果发现检测到可变路径, 
+7. 如果发现检测到可变路径,则标记该entry为可变性状
 
 
 ## has_new_bits
@@ -1236,15 +1236,12 @@ inline void discover_word(u8 *ret, u64 *current, u64 *virgin) {
 10. 查看是否crash, 处理crash
 11. 否则返回执行正确
 
-
-
-
-
-
-
 ## cull_queue
 
-该函数遍历 `afl->top_erated[]` 条目，然后顺序抓取以前未见过的字节 (temp_v) 的获胜者，并将它们标记为受欢迎的，至少直到下一次运行。在所有模糊测试步骤中，受欢迎的条目会获得更多的执行步骤
+该函数遍历 `afl->top_erated[]` 条目
+这个条目是当前字节所在的路径下,执行最优的`queue_entry`,即最短时间*最短长度达到此路径
+然后顺序抓取以前未见过的字节 (temp_v) 的获胜者，并将它们标记为受欢迎的，至少直到下一次运行。
+在所有模糊测试步骤中，受欢迎的条目会获得更多的执行步骤
 
 
 ```c
