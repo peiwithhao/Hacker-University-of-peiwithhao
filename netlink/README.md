@@ -151,7 +151,34 @@ struct sockaddr_nl {
 
 在绑定完之后就可以与内核进行交互,之后就是对于交互格式的分析
 
+在正式开始传递信息时仍需要先启动连接器
+我们的消息格式为`struct nlmsghdr + struct cn_msg + cn_msg->data[]`,
+当我们是开启连接时,我们发送的`cn_msg->data`内容为一个枚举类型
+```c
+/*
+ * Userspace sends this enum to register with the kernel that it is listening
+ * for events on the connector.
+ */
+enum proc_cn_mcast_op {
+	PROC_CN_MCAST_LISTEN = 1,
+	PROC_CN_MCAST_IGNORE = 2
+};
+```
+这个枚举类型作为data发送消息来告诉内核用户空间是否在监听内容
 
+然后调用sendmsg来发送消息
+
+那么进行连接之后呢,接受消息也是同样的套路,此时就可以自定义响应处理
+我们只需要接收消息
+```c
+...
+    ret = recvmsg(nl_fd, &msg, 0);
+...
+```
+注意这里如果是使用上面的消息结构就需要使用`recv()`来接受消息
+接收后获取`nl_fd->cn_msg`
+然后`cn_msg`里面的data结构体的类型为`struct proc_event`(`cn_proc`类型下)
+之后我们就可以判断`proc_event->what`来对不同事件分别进行处理
 
 # 参考
 
