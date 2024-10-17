@@ -30,4 +30,17 @@ libbpf是一个用来方便用户编写eBPF程序的库函数框架,因此里面
 | bpf_get_func_ret()                   | ret                      | 获取追踪进程的返回值                                         |
 | bpf_get_func_arg_cnt()               | args_cnt                 | 获取追踪进程的参数个数                                       |
 
+# trace point
+
+其中挂载点可以到`/sys/kernel/debug/tracing/available_event`中查询到
+
+
+# 参考
+
+<!--toc:start-->
+- [参考](#参考)
+<!--toc:end-->
+
+[https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_TRACING/](https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_TRACING/)
+
 
