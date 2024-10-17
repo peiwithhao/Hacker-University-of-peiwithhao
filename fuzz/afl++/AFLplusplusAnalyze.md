@@ -37,8 +37,8 @@
 - [SEEK(seek)](#seekseek)
 - [EXPLORE(exploration-based constant)](#exploreexploration-based-constant)
 <!--toc:end-->
-
-# afl-cc
+# ---- fuzzer 编译 ----
+# afl-cc.c
 首先介绍一下在afl-cc.c函数里面所涉及到的关键结构体
 ```c
 typedef struct aflcc_state {
@@ -111,7 +111,15 @@ int main(int argc, char **argv, char **envp) {
 这里简单解释一下,该代码是一层对于你给出的选项进行编译的wrapper, 实际上仍然是使用gcc或者是clang进行编译,所以涉及到编译的信息时再进行详细描述
 我们平时采用的`afl-clang-fast`等编译指令,实际上都是对于该c代码所编译形成的elf的符号链接,而该elf则会根据你传递的第一个参数来进一步设置编译选项`argv[0]`
 
-# afl-fuzz 
+# ---- fuzzer插桩 ----
+# afl-as.c
+这里为编译时插桩
+
+
+# ---- fuzzer前期准备 ----
+前期主要是做了一些afl字段的填充,测试用例的初始化, 输出输入目录处理, forkserver的创建等操作
+
+# afl-fuzz.c
 ## core struct
 
 这里介绍两个重要的结构体
@@ -1284,6 +1292,7 @@ void cull_queue(afl_state_t *afl) {
 
       /* 这里的top_entries是bitmap bytes中的排名较高的entries */
       /* trace_mini 是追踪字节 */
+      /* 这里if通过的条件是该此时的top_rated指向的queue_entry是否覆盖当前路径 */
     if (afl->top_rated[i] && (temp_v[i >> 3] & (1 << (i & 7))) &&
         afl->top_rated[i]->trace_mini) {
 
@@ -1296,6 +1305,7 @@ void cull_queue(afl_state_t *afl) {
 
         if (afl->top_rated[i]->trace_mini[j]) {
 
+                  /* temp_v[j]赋值为0表示这条路径覆盖到了 */
           temp_v[j] &= ~afl->top_rated[i]->trace_mini[j];
 
         }
@@ -1304,9 +1314,11 @@ void cull_queue(afl_state_t *afl) {
 
       if (!afl->top_rated[i]->favored) {
 
+              /* 设置favored位 */
         afl->top_rated[i]->favored = 1;
         ++afl->queued_favored;
 
+              /* 如果当前entry没有被fuzz过 */
         if (!afl->top_rated[i]->was_fuzzed) {
 
           ++afl->pending_favored;
@@ -1323,8 +1335,38 @@ void cull_queue(afl_state_t *afl) {
     }
 
   }
-
 ```
+这里的迭代实际上就是寻找能覆盖当前路径的`queue_entry`集合,且这里的集合还是最优的,集合内的`entry`标记为`favored`
+
+# show_init_stats
+快速的显示统计信息
+
+# write_stats_file
+如果当前是插桩模式的话则调用这个函数
+无监督的监控stats文件
+
+# ---- fuzzer正式开启 ----
+这里存在一个while循环用来控制整体的fuzzer进程
+1. 调用`cull_queue`函数来处理fuzz队列
+2. 如果`pending_favored && smallest_favored >= 0`,则将`afl->current_entry`设置为`smallest_favored`, 这里的`smallest_favored`一般为-1或着指向`top_rated[]->id`,然后将设置`afl->queue_cur`
+3. 执行`fuzz_one`
+
+# fuzz_one
+这里是变异的入口点,寻找默认变异器,优化等级取决于配置 
+```c
+  /*
+     -L command line paramter => limit_time_sig value
+       limit_time_sig == 0 then run the default mutator
+       limit_time_sig  > 0 then run MOpt
+       limit_time_sig  < 0 both are run
+  */
+
+  if (afl->limit_time_sig <= 0) { key_val_lv_1 = fuzz_one_original(afl); }
+  ...
+```
+如果`-L`参数没有特殊置位,那么将会调用`fuzz_one_original`
+
+# fuzz_one_original
 
 
 
