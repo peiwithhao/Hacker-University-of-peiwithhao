@@ -120,11 +120,11 @@ int main(int argc, char **argv, char **envp) {
 前期主要是做了一些afl字段的填充,测试用例的初始化, 输出输入目录处理, forkserver的创建等操作
 
 # afl-fuzz.c
-## core struct
+# core struct
 
 这里介绍两个重要的结构体
 
-### struct afl_state
+## struct afl_state
 同样这里我们需要先简单看一下该afl-fuzz的c代码所涉及到的关键结构体`afl_state_t`
 ```c
 typedef struct afl_state {
@@ -411,7 +411,7 @@ typedef struct afl_state {
 } afl_state_t;
 ```
 
-### struct afl_forkserver
+## struct afl_forkserver
 然后就是`afl_forkserver_t`
 
 ```c
@@ -588,7 +588,8 @@ int main(int argc, char **argv_orig, char **envp) {
 ....
 ```
 
-## afl_fsrv_init
+
+# afl_fsrv_init
 初始化了一些`afl->fsrv`的参数以及其子进程处理函数
 
 
@@ -664,7 +665,7 @@ void rand_set_seed(afl_state_t *afl, s64 init_seed) {
 + L:set M0pt mode, havoc_max_mult, limit_time_*
 + h:show help
 
-## setup_signal_handlers()
+# setup_signal_handlers()
 该函数用来设置信号处理函数
 ```c
 #define	SIG_ERR	 ((__sighandler_t) -1)	/* Error return.  */
@@ -681,7 +682,7 @@ void rand_set_seed(afl_state_t *afl, s64 init_seed) {
 + SIGTSTP:SIG_IGN
 + SIGPIPE:SIG_IGN
 
-## check_asan_opts
+# check_asan_opts
 读取环境变量`ASAN_OPTIONS, MSAN_OPTIONS`,然后做相应检查
 ```c
 void check_asan_opts(afl_state_t *afl) {
@@ -693,7 +694,7 @@ void check_asan_opts(afl_state_t *afl) {
   ...
 ```
 
-## fix_up_sync
+# fix_up_sync
 这个函数主要是为了使得`afl->out_dir`和当使用-S时的`sync_dir`有效化
 新配置out_dir和sync_dir
 
@@ -746,7 +747,7 @@ enum {
   afl_realloc(AFL_BUF_PARAM(eff), min_alloc);
   afl_realloc(AFL_BUF_PARAM(ex), min_alloc);
 ```
-## afl_realloc
+# afl_realloc
 该函数确保调用后 size > size_needed。否则它将重新分配buf
 ```c
   ...
@@ -765,7 +766,7 @@ enum {
   u8 *testcase_buf, *splicecase_buf;
   ...
 ```
-## save_cmdline
+# save_cmdline
 复制当前指令行
 ```c
 ...
@@ -782,24 +783,24 @@ enum {
 ...
 ```
 
-## check_if_tty
+# check_if_tty
 检查是否在TTY上面,如果说设置了`afl_no_ui`环境变量,则设置相应afl的字段
 如果没有设置这个环境变量且检查是在tty上`ioctl(1, TIOCGWINSZ, &ws)`,则报错
 
-## get_core_count
+# get_core_count
 计算逻辑CPU核心的数量
 
-## atexit
+# atexit
 这里是注册当exit被调用时需要执行的函数`at_exit()`,这里函数主要是执行杀掉相关进程,通过共享内存ID回收共享内存等等
 
-## setup_dirs_fds
+# setup_dirs_fds
 创建output的相关目录
 和获取一些必要的文件fd,例如`afl->fsrv`的`/dev/null && /dev/urandom`
 
-## bind_to_free_cpu
+# bind_to_free_cpu
 如果有对于CPU亲和性的要求那么执行该函数,
 该函数建立一个绑定指定核心的进程列表
-## init_count_class16
+# init_count_class16
 ```c
 u16 count_class_lookup16[65536];
 
@@ -822,9 +823,9 @@ void init_count_class16(void) {
 ```
 这里是初始化了`count_class_lookup16`的一个全局数组,该数组定义在`afl-fuzz-bitmap.c`当中
 
-## setup_custom_mutators
+# setup_custom_mutators
 该函数负责获取`struct custom_mutator *mutator`
-### mutator library 
+## mutator library 
 
 首先尝试有没有变异库
 ```c
@@ -845,7 +846,7 @@ void setup_custom_mutators(afl_state_t *afl) {
 如果有的话则从库中加载`afl_custom_init, afl_custom_fuzz, afl_custom_mtator`等符号,然后将地址传给mutator, 然后将其挂到`afl->custom_mutator_list`这个链表上面,然后相应计数+1
 
 
-### python module
+## python module
 
 ```c
   /* Try Python module */
@@ -861,14 +862,14 @@ void setup_custom_mutators(afl_state_t *afl) {
 然后尝试python模块, 如果获取到了模块名
 则我们同样需要新创建一个mutator,然后挂上相同链表
 
-## setup_cmdline_file
+# setup_cmdline_file
 缓存我们的指令还来重现我们的发现
 这里主要是将argv[i]以行的形式写入我们的`/out/default/cmdline`文件
 
-## check_binary
+# check_binary
 检查目标二进制文件是否存在,然后检查他是否是一个shell脚本
 
-## write_setup_file
+# write_setup_file
 写fuzzer_setup,这个文件也是位于`out/default`目录下
 这个文件打开的例子如下,
 ```sh
@@ -882,7 +883,7 @@ AFL_SKIP_CPUFREQ=1
 # command line:
 'afl-fuzz' '-i' '/home/fuzzing_libexif/exif-samples-master/jpg/' '-o' '/home/fuzzing_libexif/out/' '-s' '123' '--' '/home/fuzzing_libexif/install/bin/exif' '@@'
 ```
-## read_testcases
+# read_testcases
 从输入目录读取所有的测试用例, 然后将他们进行排队测试, 在开始时调用
 这里使用`scandir()+alphasort()`而不是`readdir()`的原因是后者可能造成测试样例顺序的紊乱导致难以控制
 
@@ -891,9 +892,9 @@ AFL_SKIP_CPUFREQ=1
 
 其中的&nl是一个指向 `struct dirent **` 类型的指针的地址。`scandir`函数会分配内存并填充这个指针，指向一个包含目录项的结构体数组。每个结构体代表一个文件或子目录。
 
-## add_to_queue
+# add_to_queue
 将新的测试样例添加到队列,每个队列元素为`struct queue_entry`
-### struct queue_entry
+## struct queue_entry
 ```c
 struct queue_entry {
 
@@ -958,13 +959,13 @@ struct queue_entry {
 5. 扩充一个存放`queue_entry`地址的数组,这个数组被记录在`afl->queue_buf`,数组个数取决于`afl->queued_items`,然后将q记录在末尾,并将q->id记录为index
 
 
-## pivot_inputs
+# pivot_inputs
 在输出目录中创建输入测试用例的硬链接，选择好名字并相应地调整
 
-## setup_stdio_file
+# setup_stdio_file
 为了被fuzz的数据建立output文件,如果没使用-f的话,创建`tmp_dir/.cur_input`文件,将其作为`fsrv.out_file`
 
-## setup_testcase_shmem
+# setup_testcase_shmem
 建立共享映射,使用共享内存来进行输入来进行fuzz
 ```c
 void setup_testcase_shmem(afl_state_t *afl) {
@@ -993,18 +994,18 @@ void setup_testcase_shmem(afl_state_t *afl) {
 这个函数是设置fsrv的一些共享内存相关字段
 
 
-## afl_shm_init
+# afl_shm_init
 这个函数用来配置共享内存, 返回`shm->map`,这里新创建的shmem会链接到全局的`shm_list`当中
 ```c
 /* afl-sharedmem.c */
 static list_t shm_list = {.element_prealloc_count = 0};
 ```
 
-## afl_fsrv_start
+# afl_fsrv_start
 启动fork服务器
 这里构造了两个pipe`st_pipe, ctl_pipe`, 然后fork一个子进程作为`fork server`
 
-### CHILD PROCESS
+## CHILD PROCESS
 
 下面是child_process代码
 ```c
@@ -1093,7 +1094,7 @@ static list_t shm_list = {.element_prealloc_count = 0};
 4. 关闭多余的fd并设置`sanitizer`
 5. 执行二进制函数, 这里`fsrv->init_child_func`被指向为`fsrv_exec_child`,这里的赋值是由`afl_fsrv_init`函数来做的
 
-### fsrv_exec_child
+## fsrv_exec_child
 ```c
 static void fsrv_exec_child(afl_forkserver_t *fsrv, char **argv) {
 
@@ -1111,25 +1112,25 @@ static void fsrv_exec_child(afl_forkserver_t *fsrv, char **argv) {
 ```
 这里是子进程执行`targer_path`路径所代表的程序,作为服务器来运行,值得注意的是经过调试这里的`target_path`就是我们被fuzz的程序,但是在运行之时他的功能为一个fuzz服务器,跟进调试发现他在运行`instrumentation/`目录下一个c程序的代码,应该是我们初步`afl-cc`的时候进行插桩导致的
 
-### PARENT PROCESS
+## PARENT PROCESS
 1. 首先打印子进程pid
 2. 关闭多于的fd,这里只保留`ctl_pipe`的写和`st_pipe`的读
 3. 等待fork服务器的启动,不会耗费太多时间
 4. 尝试从`st_fd`读取四字节信息来获知服务器已经启动
 
 
-## load_auto
+# load_auto
 
 加载自动生成的extras
 这里的`extras`指的是确定性的注入词典术语,可以显示为`用户`或者`自动
 
-## deunicode_extras
+# deunicode_extras
 有时输入中的字符串会在内部转换为 unicode，因此对于模糊测试，如果它看起来像简单的 unicode，我们应该尝试去 解码unicode
 
-## dedup_extras
+# dedup_extras
 从加载到的extras中移除复制部分, 这里能够在多个文件被加载时发生
 
-## perform_dry_run
+# perform_dry_run
 对所有测试用例执行试运行，以确认应用程序按预期工作。这仅针对初始输入执行，并且仅执行一次
 
 1. for循环读取每个`queue_entry`
@@ -1138,7 +1139,7 @@ static void fsrv_exec_child(afl_forkserver_t *fsrv, char **argv) {
 
 
 
-## calibrate_case
+# calibrate_case
 校准新的测试用例。这是在处理输入目录以尽早警告不稳定或其他有问题的测试用例时完成的；当发现新路径来检测可变行为时等等
 
 1. 如果校准的entry不是来自queue或者现在是恢复fuzz会话,那么超时时间将增加一部分,这样有助于避免间歇性延迟而产生的问题
@@ -1159,7 +1160,7 @@ static void fsrv_exec_child(afl_forkserver_t *fsrv, char **argv) {
 7. 如果发现检测到可变路径,则标记该entry为可变性状
 
 
-## has_new_bits
+# has_new_bits
 检查当前执行路径是否给表带来了任何新内容。更新原始位以反映发现。
 + 如果唯一的变化是特定元组的命中计数，则返回 1； 
 + 如果有新的元组出现则返回2。
@@ -1173,13 +1174,13 @@ static void fsrv_exec_child(afl_forkserver_t *fsrv, char **argv) {
 
 注意`virgin_map`保存的是没有被覆盖的基本快,初始为全1
 
-## write_to_testcase
+# write_to_testcase
 主要是将之前测试用例的`use_mem`写入到`afl.fsrv->shmem_fuzz`当中
 
-## count_bytes
+# count_bytes
 计算给定的位图中有多少字节有置位
 
-## update_bitmap_score
+# update_bitmap_score
 当我们遇到一条新路径时，我们称其为查看该路径是否比任何现有路径更有利。 “有利条件”的目的是拥有一组最小的路径来触发迄今为止在位图中看到的所有位，并专注于对它们进行模糊测试，而牺牲其余部分。
    该过程的第一步是维护位图中每个字节的`afl->top_erated[]`  条目列表。如果没有先前的竞争者，或者竞争者具有更有利的速度 x 尺寸系数，我们将赢得该位置
 
@@ -1194,7 +1195,7 @@ static void fsrv_exec_child(afl_forkserver_t *fsrv, char **argv) {
 
 
 
-## discover_word
+# discover_word
 ```c
 inline void discover_word(u8 *ret, u64 *current, u64 *virgin) {
 
@@ -1230,7 +1231,7 @@ inline void discover_word(u8 *ret, u64 *current, u64 *virgin) {
 
 整个函数的目的是寻找是否存在在`virgin_map`为初始化的某个比特位,`current_map`有了新的发现,如果有则更新`virgin_map`
 
-## afl_fsrv_run_target
+# afl_fsrv_run_target
 执行目标进程,检测是否超时, 返回状态信息,他是`afl_fsrv_run_target`的一层wrapper
 1. 如果不是`nyx_mode`,则设置`fsrv->trace_bits`为0
 2. 向`fsrv_ctl_fd`写入控制字段,告诉`fork server`上次运行是否超时
@@ -1244,7 +1245,7 @@ inline void discover_word(u8 *ret, u64 *current, u64 *virgin) {
 10. 查看是否crash, 处理crash
 11. 否则返回执行正确
 
-## cull_queue
+# cull_queue
 
 该函数遍历 `afl->top_erated[]` 条目
 这个条目是当前字节所在的路径下,执行最优的`queue_entry`,即最短时间*最短长度达到此路径
@@ -1293,13 +1294,14 @@ void cull_queue(afl_state_t *afl) {
       /* 这里的top_entries是bitmap bytes中的排名较高的entries */
       /* trace_mini 是追踪字节 */
       /* 这里if通过的条件是该此时的top_rated指向的queue_entry是否覆盖当前路径 */
+      /* 这里进入if的条件是该top_entry[i]存在， temp_v[i]并没有被之前的路径覆盖， 且当前的top_entry[i]覆盖了位图i所在的路径 */
     if (afl->top_rated[i] && (temp_v[i >> 3] & (1 << (i & 7))) &&
         afl->top_rated[i]->trace_mini) {
 
       u32 j = len;
 
       /* Remove all bits belonging to the current entry from temp_v. */
-          /* 从temp_v中移除隶属于当前entry的比特位 */
+          /* 从temp_v中移除隶属于当前entry能覆盖的所有的比特位 */
 
       while (j--) {
 
@@ -1311,6 +1313,7 @@ void cull_queue(afl_state_t *afl) {
         }
 
       }
+          /* 如果当前路径每标记为受青睐 */
 
       if (!afl->top_rated[i]->favored) {
 
@@ -1367,7 +1370,107 @@ void cull_queue(afl_state_t *afl) {
 如果`-L`参数没有特殊置位,那么将会调用`fuzz_one_original`
 
 # fuzz_one_original
+从队列中取出当前entry, 然后对其进行模糊测试, 这里的返回值为0表示成功fuzz,如果返回1则表示跳过
 
+如果有待受青睐的entry,也就是`afl->pending_favored`,
+```c
+
+  if (likely(afl->pending_favored)) {
+
+    /* If we have any favored, non-fuzzed new arrivals in the queue,
+       possibly skip to them at the expense of already-fuzzed or non-favored
+       cases. */
+      /* 如果我们有受到青睐并且没有被fuzz过的新路径到达， 或许我们将会跳过fuzz,但会牺牲掉已经被fuzz或者不受青睐的例子 */
+
+    if ((afl->queue_cur->fuzz_level || !afl->queue_cur->favored) &&
+          /* 99%概率跳过 */
+        likely(rand_below(afl, 100) < SKIP_TO_NEW_PROB)) {
+
+      return 1;
+
+    }
+  } else if (!afl->non_instrumented_mode && !afl->queue_cur->favored &&
+
+             afl->queued_items > 10) {
+
+    /* Otherwise, still possibly skip non-favored cases, albeit less often.
+       The odds of skipping stuff are higher for already-fuzzed inputs and
+       lower for never-fuzzed entries. */
+      /* 否则，仍然大概率跳过不受青睐的例子， 尽管较少
+       * 跳过的概率高于已经被fuzz的输入，低于从没被fuzz过的entry */
+
+    if (afl->queue_cycle > 1 && !afl->queue_cur->fuzz_level) {
+          /* 75%的概率跳过 */
+      if (likely(rand_below(afl, 100) < SKIP_NFAV_NEW_PROB)) { return 1; }
+
+    } else {
+          /* 95%的概率跳过 */
+      if (likely(rand_below(afl, 100) < SKIP_NFAV_OLD_PROB)) { return 1; }
+
+    }
+
+  }
+```
+这里的函数首先判断fuzz队列里面有没有待青睐的entry,
+如果有则将会执行如下几个if判断条件
+1. 如果说当前`afl->queue_cur`如果没有被标记为青睐或者已经被fuzz过了，则有99%的概率跳过此轮
+如果没有待青睐的entry,则判断当前`afl->queue_cur`如果未受到青睐，且队列条目大于10,则仍然大概率跳过此轮fuzz
+
+经过上面的判断，这里存在的大部分是受到青睐的`queue_entry`,并且一般是没有被fuzz过的
+
+```c
+/* 从当前的queue entry中获得测试样例文件的buffer */
+  orig_in = in_buf = queue_testcase_get(afl, afl->queue_cur);
+  len = afl->queue_cur->len;
+
+/* 重新分配输出buffer */
+  out_buf = afl_realloc(AFL_BUF_PARAM(out), len);
+  if (unlikely(!out_buf)) { PFATAL("alloc"); }
+
+  afl->subseq_tmouts = 0;
+
+  afl->cur_depth = afl->queue_cur->depth;
+```
+接下来就是fuzz的几个阶段
+
+# CALIBRATION 阶段
+该阶段用来校验测试用例
+
+
+```c
+  /*******************************************
+   * CALIBRATION (only if failed earlier on) *
+   *******************************************/
+
+  if (unlikely(afl->queue_cur->cal_failed)) {
+
+    u8 res = FSRV_RUN_TMOUT;
+
+    if (afl->queue_cur->cal_failed < CAL_CHANCES) {
+
+      afl->queue_cur->exec_cksum = 0;
+
+      res =
+          calibrate_case(afl, afl->queue_cur, in_buf, afl->queue_cycle - 1, 0);
+
+      if (unlikely(res == FSRV_RUN_ERROR)) {
+
+        FATAL("Unable to execute target application");
+
+      }
+
+    }
+
+    if (unlikely(afl->stop_soon) || res != afl->crash_mode) {
+
+      ++afl->cur_skipped_items;
+      goto abandon_entry;
+
+    }
+
+  }
+```
+# TRIMMING阶段
 
 
 # FAST(exponential)
