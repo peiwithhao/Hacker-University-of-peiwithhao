@@ -432,8 +432,41 @@ int main()
 
     return 0;
 }
-
 ```
+
+# Baby_cfhp
+这一题开头送了一个任意地址写，且本身是`no pie`的
+```c
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void){
+	unsigned long *ptr;
+	int idx, val;
+	printf("address: ");
+	scanf("%ld", &ptr);
+	printf("value: ");
+	scanf("%i", &val);
+    /*(获取ptr指针内容的0xffffffffffff0000) | ptr指针内容低0xff异或var的低0xff再异或 */
+	*ptr = (*ptr & ~((1<<16)-1)) | ((*ptr & 0xff) ^ ((val & 0xff) ^ ((val & 0xff) >> 1))) | (*ptr & 0xffff &~0xff);	
+	exit(0);
+}
+
+__attribute__((constructor))
+void init(void){
+	setbuf(stdin, NULL);
+	setbuf(stdout, NULL);
+	setbuf(stderr, NULL);
+}
+```
+
+思路大概是先修改exit_got为_start函数，然后修改setbuf_got为puts来泄露libc,最后修改exit_got为one_gadget
+
+
+
+
 
 # 参考
 [https://blog.imv1.me/2021/04/15/ret2dl_resolve/](https://blog.imv1.me/2021/04/15/ret2dl_resolve/)
