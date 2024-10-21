@@ -1436,7 +1436,6 @@ void cull_queue(afl_state_t *afl) {
 # CALIBRATION 阶段
 该阶段用来校验测试用例
 
-
 ```c
   /*******************************************
    * CALIBRATION (only if failed earlier on) *
@@ -1471,6 +1470,198 @@ void cull_queue(afl_state_t *afl) {
   }
 ```
 # TRIMMING阶段
+```c
+  /************
+   * TRIMMING *
+   ************/
+
+  if (unlikely(!afl->non_instrumented_mode && !afl->queue_cur->trim_done &&
+               !afl->disable_trim)) {
+
+    u32 old_len = afl->queue_cur->len;
+
+    u8 res = trim_case(afl, afl->queue_cur, in_buf);
+    orig_in = in_buf = queue_testcase_get(afl, afl->queue_cur);
+
+    if (unlikely(res == FSRV_RUN_ERROR)) {
+
+      FATAL("Unable to execute target application");
+
+    }
+
+    if (unlikely(afl->stop_soon)) {
+
+      ++afl->cur_skipped_items;
+      goto abandon_entry;
+
+    }
+
+    /* Don't retry trimming, even if it failed. */
+
+    afl->queue_cur->trim_done = 1;
+
+    len = afl->queue_cur->len;
+
+    /* maybe current entry is not ready for splicing anymore */
+    if (unlikely(len <= 4 && old_len > 4)) --afl->ready_for_splicing_count;
+
+  }
+
+  memcpy(out_buf, in_buf, len);
+```
+这一段的主要目的是剪枝
+
+# PERFORMANCE SCORE阶段
+```c
+
+  /*********************
+   * PERFORMANCE SCORE *
+   *********************/
+
+  /* 获取执行评分 */
+  if (likely(!afl->old_seed_selection))
+    orig_perf = perf_score = afl->queue_cur->perf_score;
+  else
+    afl->queue_cur->perf_score = orig_perf = perf_score =
+        calculate_score(afl, afl->queue_cur);
+
+  if (unlikely(perf_score <= 0 && afl->active_items > 1)) {
+
+    goto abandon_entry;
+
+  }
+
+  if (unlikely(afl->shm.cmplog_mode &&
+               afl->queue_cur->colorized < afl->cmplog_lvl &&
+               (u32)len <= afl->cmplog_max_filesize)) {
+
+    if (unlikely(len < 4)) {
+
+      afl->queue_cur->colorized = CMPLOG_LVL_MAX;
+
+    } else {
+
+      if (afl->queue_cur->favored || afl->cmplog_lvl == 3 ||
+          (afl->cmplog_lvl == 2 &&
+           (afl->queue_cur->tc_ref ||
+            afl->fsrv.total_execs % afl->queued_items <= 10)) ||
+          get_cur_time() - afl->last_find_time > 250000) {  // 250 seconds
+
+        if (input_to_state_stage(afl, in_buf, out_buf, len)) {
+
+          goto abandon_entry;
+
+        }
+
+      }
+
+    }
+
+  }
+
+  u64 before_det_time = get_cur_time();
+  if (!afl->skip_deterministic) {
+
+    if (!skip_deterministic_stage(afl, in_buf, out_buf, len, before_det_time)) {
+
+      goto abandon_entry;
+
+    }
+
+  }
+
+  u8 *skip_eff_map = afl->queue_cur->skipdet_e->skip_eff_map;
+
+  /* Skip right away if -d is given, if it has not been chosen sufficiently
+     often to warrant the expensive deterministic stage (fuzz_level), or
+     if it has gone through deterministic testing in earlier, resumed runs
+     (passed_det). */
+  /* 如果给出 -d，
+   * 如果没有足够频繁地选择它以保证昂贵的确定性阶段（fuzz_level）
+   * 或者如果它在之前恢复的运行中经过了确定性测试（passed_det）
+   * 则立即跳过。 */
+  /* if skipdet decide to skip the seed or no interesting bytes found,
+     we skip the whole deterministic stage as well */
+  /* 如果确定性阶段的标识符被设置，并且没有有趣的字节被找到
+   * 则条或整个确定性阶段*/
+
+  if (likely(afl->skip_deterministic) || likely(afl->queue_cur->passed_det) ||
+      likely(!afl->queue_cur->skipdet_e->quick_eff_bytes) ||
+      likely(perf_score <
+             (afl->queue_cur->depth * 30 <= afl->havoc_max_mult * 100
+                  ? afl->queue_cur->depth * 30
+                  : afl->havoc_max_mult * 100))) {
+
+    goto custom_mutator_stage;
+
+  }
+
+  /* Skip deterministic fuzzing if exec path checksum puts this out of scope
+     for this main instance. */
+
+  if (unlikely(afl->main_node_max &&
+               (afl->queue_cur->exec_cksum % afl->main_node_max) !=
+                   afl->main_node_id - 1)) {
+
+    goto custom_mutator_stage;
+
+  }
+
+  doing_det = 1;
+
+```
+
+# SIMPLE BITFLIP阶段
+这里的代码有点长，所以分批讲解
+```c
+
+  /*********************************************
+   * SIMPLE BITFLIP (+dictionary construction) *
+   *********************************************/
+
+#define FLIP_BIT(_ar, _b)                     \
+  do {                                        \
+                                              \
+    u8 *_arf = (u8 *)(_ar);                   \
+    u32 _bf = (_b);                           \
+    _arf[(_bf) >> 3] ^= (128 >> ((_bf) & 7)); \
+                                              \
+  } while (0)
+```
+首先他定义了一个宏`FLIP_BIT(_ar, _b)`
+这个宏的含义就是将`_ar`这个指针修改为字节数组`_arf`,然后传入的`_b`是第几个比特位，然后按照后面的比特位来对该`_arf`所处的比特异或
+
+所以这个宏就是翻转`_ar`代表的二进制串的第`_b`个比特位
+然后他即将调用`common_fuzz_stuff()`函数来清空cksum
+
+# common_fuzz_stuff
+这个函数是写被修改的test case, 运行程序和处理结果
+首先将当前`out_buf`代表的程序输入作为案例写到AFL列表当中，然后运行该进程
+然后处理`fuzz_run_target`的返回参数, 之后调用`save_if_interesting`发现这个测试案例是有趣的则将当前案例接入队列
+至于返回值的话，如果说是时候退出则返回1
+
+
+
+在这之后该阶段将处理一个循环， 处理的循环次数为`len << 3`,阶段名字`stage_name = "bitflip 1/1"`
+从这里开始翻转1位
+1. 获取当前字节`afl->stage_cur_byte = afl->stage_cur >> 3`
+2. 一些检查， 翻转`out_buf`的当前比特位`afl->stage_cur`
+3. 调用`common_fuzz_stuff`执行目标程序， 若发现有趣路径，则加入队列
+4. 再次翻转同样的比特位， 这样只是恢复原样
+5. 如果发现现在的比特位是字节中的最后一位，则顺序执行，否则跳到步骤6
+    1. 计算当前案例的`afl->fsrv.trace_bits`的hash值
+    2. 如果发现当前比特位是整个二进制的最后一位且执行路径变化,则查看是否有值得排队的内容，如果有则收集该内容
+    3. 在只有发现执行hash修改的情况下才收集该翻转位
+6. 执行步骤1
+
+接下来进入翻转2位阶段
+
+
+
+
+
+
+
 
 
 # FAST(exponential)
