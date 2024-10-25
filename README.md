@@ -24,3 +24,5 @@ As we embark on this exploration of hacking techniques, we aim to cultivate a co
 |..|..|[fuse](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/fuse)|..|
 |[fuzz](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/fuzz)|..|..|..|
 |[trace](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/trace)|..|..|..|
+|[ctf](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/ctf)|..|..|..|
+|[netlink](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/netlink)|..|..|
