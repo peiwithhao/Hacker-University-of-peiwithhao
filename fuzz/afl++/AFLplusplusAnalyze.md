@@ -1,33 +1,67 @@
 <!--toc:start-->
-- [afl-cc](#afl-cc)
-- [afl-fuzz](#afl-fuzz)
-  - [core struct](#core-struct)
-    - [struct afl_state](#struct-aflstate)
-    - [struct afl_forkserver](#struct-aflforkserver)
-  - [setup_signal_handlers()](#setupsignalhandlers)
-  - [check_asan_opts](#checkasanopts)
-  - [fix_up_sync](#fixupsync)
-  - [afl_realloc](#aflrealloc)
-  - [save_cmdline](#savecmdline)
-  - [check_if_tty](#checkiftty)
-  - [get_core_count](#getcorecount)
-  - [atexit](#atexit)
-  - [setup_dirs_fds](#setupdirsfds)
-  - [bind_to_free_cpu](#bindtofreecpu)
-  - [init_count_class16](#initcountclass16)
-  - [setup_custom_mutators](#setupcustommutators)
-    - [mutator library](#mutator-library)
-    - [python module](#python-module)
-  - [setup_cmdline_file](#setupcmdlinefile)
-  - [check_binary](#checkbinary)
-  - [write_setup_file](#writesetupfile)
-  - [read_testcases](#readtestcases)
-  - [add_to_queue](#addtoqueue)
-    - [struct queue_entry](#struct-queueentry)
-  - [pivot_inputs](#pivotinputs)
-  - [setup_stdio_file](#setupstdiofile)
-  - [setup_testcase_shmem](#setuptestcaseshmem)
-  - [afl_shm_init](#aflshminit)
+- [---- fuzzer 编译 ----](#fuzzer-编译)
+- [afl-cc.c](#afl-ccc)
+- [---- fuzzer插桩 ----](#fuzzer插桩)
+- [afl-as.c](#afl-asc)
+- [---- fuzzer前期准备 ----](#fuzzer前期准备)
+- [afl-fuzz.c](#afl-fuzzc)
+- [core struct](#core-struct)
+  - [struct afl_state](#struct-aflstate)
+  - [struct afl_forkserver](#struct-aflforkserver)
+- [afl_fsrv_init](#aflfsrvinit)
+- [setup_signal_handlers()](#setupsignalhandlers)
+- [check_asan_opts](#checkasanopts)
+- [fix_up_sync](#fixupsync)
+- [afl_realloc](#aflrealloc)
+- [save_cmdline](#savecmdline)
+- [check_if_tty](#checkiftty)
+- [get_core_count](#getcorecount)
+- [atexit](#atexit)
+- [setup_dirs_fds](#setupdirsfds)
+- [bind_to_free_cpu](#bindtofreecpu)
+- [init_count_class16](#initcountclass16)
+- [setup_custom_mutators](#setupcustommutators)
+  - [mutator library](#mutator-library)
+  - [python module](#python-module)
+- [setup_cmdline_file](#setupcmdlinefile)
+- [check_binary](#checkbinary)
+- [write_setup_file](#writesetupfile)
+- [read_testcases](#readtestcases)
+- [add_to_queue](#addtoqueue)
+  - [struct queue_entry](#struct-queueentry)
+- [pivot_inputs](#pivotinputs)
+- [setup_stdio_file](#setupstdiofile)
+- [setup_testcase_shmem](#setuptestcaseshmem)
+- [afl_shm_init](#aflshminit)
+- [afl_fsrv_start](#aflfsrvstart)
+  - [CHILD PROCESS](#child-process)
+  - [fsrv_exec_child](#fsrvexecchild)
+  - [PARENT PROCESS](#parent-process)
+- [load_auto](#loadauto)
+- [deunicode_extras](#deunicodeextras)
+- [dedup_extras](#dedupextras)
+- [perform_dry_run](#performdryrun)
+- [calibrate_case](#calibratecase)
+- [has_new_bits](#hasnewbits)
+- [write_to_testcase](#writetotestcase)
+- [count_bytes](#countbytes)
+- [update_bitmap_score](#updatebitmapscore)
+- [discover_word](#discoverword)
+- [afl_fsrv_run_target](#aflfsrvruntarget)
+- [cull_queue](#cullqueue)
+- [show_init_stats](#showinitstats)
+- [write_stats_file](#writestatsfile)
+- [---- fuzzer正式开启 ----](#fuzzer正式开启)
+- [fuzz_one](#fuzzone)
+- [fuzz_one_original](#fuzzoneoriginal)
+- [CALIBRATION 阶段](#calibration-阶段)
+- [TRIMMING阶段](#trimming阶段)
+- [PERFORMANCE SCORE阶段](#performance-score阶段)
+- [SIMPLE BITFLIP阶段](#simple-bitflip阶段)
+- [common_fuzz_stuff](#commonfuzzstuff)
+- [ARITHMETIC 阶段](#arithmetic-阶段)
+- [INTERESTING VALUE阶段](#interesting-value阶段)
+- [DICTIONARY STUFF阶段](#dictionary-stuff阶段)
 - [FAST(exponential)](#fastexponential)
 - [COE(cut-off exponential)](#coecut-off-exponential)
 - [LIN(linear)](#linlinear)
@@ -37,6 +71,8 @@
 - [SEEK(seek)](#seekseek)
 - [EXPLORE(exploration-based constant)](#exploreexploration-based-constant)
 <!--toc:end-->
+
+
 # ---- fuzzer 编译 ----
 # afl-cc.c
 首先介绍一下在afl-cc.c函数里面所涉及到的关键结构体
@@ -1640,26 +1676,108 @@ void cull_queue(afl_state_t *afl) {
 然后处理`fuzz_run_target`的返回参数, 之后调用`save_if_interesting`发现这个测试案例是有趣的则将当前案例接入队列
 至于返回值的话，如果说是时候退出则返回1
 
-
-
 在这之后该阶段将处理一个循环， 处理的循环次数为`len << 3`,阶段名字`stage_name = "bitflip 1/1"`
 从这里开始翻转1位
 1. 获取当前字节`afl->stage_cur_byte = afl->stage_cur >> 3`
 2. 一些检查， 翻转`out_buf`的当前比特位`afl->stage_cur`
-3. 调用`common_fuzz_stuff`执行目标程序， 若发现有趣路径，则加入队列
+3. 调用`common_fuzz_stuff`执行目标程序， 若发现有趣路径，这里判断是否有趣为在程序运行过程中有无新的路径出现，则加入队列
 4. 再次翻转同样的比特位， 这样只是恢复原样
-5. 如果发现现在的比特位是字节中的最后一位，则顺序执行，否则跳到步骤6
-    1. 计算当前案例的`afl->fsrv.trace_bits`的hash值
-    2. 如果发现当前比特位是整个二进制的最后一位且执行路径变化,则查看是否有值得排队的内容，如果有则收集该内容
-    3. 在只有发现执行hash修改的情况下才收集该翻转位
+5. 如果发现现在的bit是字节中的最后一位，则顺序执行，否则跳到步骤5
+    1. 计算当前案例的`afl->fsrv.trace_bits`的hash值cksum
+    2. 如果不是整个字节串的末尾，则顺序进入下面判断， 否则跳到步骤5：
+    3. 首先判断翻转后的cksum和`prev_cksum`是否相同，如果不同则判断`a_len`是否位于一个特定范围，如果是则判断`a_collect`所收集到的字符串为一个token，并且记录下来
+    4. 判断cksum初始`_prev_cksum`是否相同，如果不相同则说明该位翻转导致了原始路径改变把当前字节记录在`a_collect`当中，且`++a_len`,
+    5. 这里是判断了本次翻转的是最后一bit,如果发现此时记录token的流程还在进行，则强行收集该输出
 6. 执行步骤1
 
-接下来进入翻转2位阶段
+本阶段主要是按位进行翻转，然后手机是否有特殊字符串，如果说我们修改一段二进制比特位发现他们所执行的路径和源路径不一致且均相同，则可以大致判定所修改的这一段字节为一个token
 
+然后记录一下所执行的次数和寻找到的新路径
+```c
+  new_hit_cnt = afl->queued_items + afl->saved_crashes;
 
+  afl->stage_finds[STAGE_FLIP1] += new_hit_cnt - orig_hit_cnt;
+  afl->stage_cycles[STAGE_FLIP1] += afl->stage_max;
+```
 
+接下来进入翻转2位阶段,方法同上述基本类似，少了寻找token的阶段，区别是每次翻转相邻两位
+阶段名字`stage_name = "bitflip 2/1"`
 
+然后进入4bit翻转,类似，每次翻转相邻4位
+阶段名字`stage_name = "bitflip 4/1`
 
+然后进入字节翻转
+阶段名字`stage_name = "bitflip 8/8`
+
+然后进入双字节翻转，步长为8位
+阶段名字`stage_name = "bitflip 16/8`
+
+然后进入四字节翻转，步长为8位
+阶段名字`stage_name = "bitflip 32/8`
+
+# ARITHMETIC 阶段
+首先的阶段名称为`arith 8/8`
+这里的总阶段数为
+```c
+  afl->stage_max = 2 * len * ARITH_MAX;
+```
+
+然后这里的策略是遍历`out_buf`的每个字节
+然后获取某个字节后开启一个内部循环
+```c
+    for (j = 1; j <= ARITH_MAX; ++j) {
+
+      u8 r = orig ^ (orig + j);
+
+        ...
+
+        out_buf[i] = orig + j;
+
+        ...
+        if (common_fuzz_stuff(afl, out_buf, len)) { goto abandon_entry; }
+```
+这里是将原始字节加上一个循环值，然后fuzz目标程序，之后同样也会减去该循环值然后fuzz目标程序
+
+然后记录一下所执行的次数和寻找到的新路径
+```c
+  new_hit_cnt = afl->queued_items + afl->saved_crashes;
+
+  afl->stage_finds[STAGE_ARITH8] += new_hit_cnt - orig_hit_cnt;
+  afl->stage_cycles[STAGE_ARITH8] += afl->stage_max;
+```
+之后就同上面的`bitflip`阶段类似
+```c
+  afl->stage_name = "arith 16/8";
+```
+这一阶段所采取的措施较多，分别为
+1. (u16)orig+j
+2. (u16)orig-j
+3. (swap16)((swap16)orig+j)
+4. (swap16)((swap16)orig-j)
+其中下面两行是考虑到大端序列所以分开测试
+
+下一阶段是32字节
+```c
+  afl->stage_name = "arith 32/8";
+```
+采取的措施为
+1. (u32)orig+j
+2. (u32)orig-j
+3. (swap32)((swap32)orig+j)
+4. (swap32)((swap32)orig-j)
+
+# INTERESTING VALUE阶段
+第一个阶段为
+```c
+  afl->stage_name = "interest 8/8";
+```
+这里的策略就是将指定字节换成`interesting_8[j]`,分别从该数组里面替换然后运行程序
+
+然后下面的阶段分别是`interest 16/8, interest 32/8`
+他们所替换的数组分别为`interesting_16[], interesting_32[]`
+
+# DICTIONARY STUFF阶段
+阶段名为`user extras (over)`
 
 
 
