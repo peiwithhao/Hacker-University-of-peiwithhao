@@ -1778,29 +1778,29 @@ void cull_queue(afl_state_t *afl) {
 
 # DICTIONARY STUFF阶段
 阶段名为`user extras (over)`
+这里的策略是遍历整个`out_buf`,然后用`afl->extras[]`来替换,注意这里在替换的过程中是不会还原的，而是会不断覆盖，然后执行目标程序
 
+下一阶段名为`user extras (insert)`
+这里的策略与上面类似，只不过在替换过程中不是覆盖而是插入，也就是会复原`out_buf`后面的部分
 
+下一阶段名为`auto extras (over)`
+策略大致相同，只是用`afl->a_extras[]`来替换
 
+下一阶段名为`auto extras (insert)`
+基本同上，将over改为insert
 
-# FAST(exponential)
-指数
-# COE(cut-off exponential)
-截止指数
-# LIN(linear)
-线性
-# QUAD(quadratic)
-二次
-# MMOPT(modified M0pt)
-修改后的M0pt优化
-# RARE(rare edge focus)
-罕见的边缘焦点
-# SEEK(seek)
-寻找
-# EXPLORE(exploration-based constant)
-基于探索的常数
+# CUSTOM MUTATORS 阶段
+阶段名为`custrom mutator`,这里是使用`afl->custom_mutator_list`中的`custom_mutator`来对每个`out_buf`进行变异，然后执行目标程序
 
+# RANDOM HAVOC阶段
+阶段名为`havoc`,大致看下来就是生成随机数，根据这个随机数选择变策略
 
+# SPLICING 阶段
+这个阶段的策略就是随机选择另一个输入,然后在随机值将当前输入和选择的另外一个输入进行拼接
 
+至此我们的`fuzz_one_original`阶段结束
+
+# ---- fuzzer 插桩 ----
 
 
 
