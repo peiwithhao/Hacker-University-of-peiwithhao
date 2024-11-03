@@ -1,3 +1,60 @@
+<!--toc:start-->
+- [Arch linux使用](#arch-linux使用)
+- [0x00.挂载/卸载qcow2文件系统](#0x00挂载卸载qcow2文件系统)
+- [0x01.较常用的qemu启动脚本(x86_64版本)](#0x01较常用的qemu启动脚本x8664版本)
+- [0x02.pacman包管理](#0x02pacman包管理)
+- [0x03.网络管理](#0x03网络管理)
+- [0x04.日志管理](#0x04日志管理)
+- [0x05.文件系统相关](#0x05文件系统相关)
+  - [rsync](#rsync)
+  - [unzip](#unzip)
+  - [ranger使用](#ranger使用)
+    - [1.排序](#1排序)
+    - [2.书签](#2书签)
+    - [3.标签页（tab）](#3标签页tab)
+    - [4.选择文件](#4选择文件)
+    - [5.查看文件](#5查看文件)
+    - [6.编辑文件](#6编辑文件)
+    - [7.处理文件](#7处理文件)
+    - [8.运行文件](#8运行文件)
+  - [ls](#ls)
+  - [find](#find)
+  - [awk](#awk)
+- [0x06.GDB调试](#0x06gdb调试)
+- [0x07.权限相关](#0x07权限相关)
+- [0x08.窗口管理](#0x08窗口管理)
+- [0x09.Hyprland](#0x09hyprland)
+  - [hyprpicker 取色器](#hyprpicker-取色器)
+- [0x0A.阅读](#0x0a阅读)
+- [0x0B.编译](#0x0b编译)
+  - [make](#make)
+  - [GCC](#gcc)
+  - [strip](#strip)
+  - [pkg-config](#pkg-config)
+- [0x0C.trace技巧](#0x0ctrace技巧)
+  - [ftrace](#ftrace)
+  - [strace](#strace)
+  - [ltrace](#ltrace)
+- [0x0D.二进制分析](#0x0d二进制分析)
+  - [patchelf](#patchelf)
+  - [objdump](#objdump)
+  - [objcopy](#objcopy)
+  - [readelf](#readelf)
+- [0x0E.特殊文件](#0x0e特殊文件)
+  - [/proc/<pid\>/maps](#procpidmaps)
+  - [/proc/kcore](#prockcore)
+  - [/boot/System.map](#bootsystemmap)
+  - [/proc/kallsyms](#prockallsyms)
+  - [/proc/iomem](#prociomem)
+  - [/proc/cmdline](#proccmdline)
+- [0x0F.服务管理](#0x0f服务管理)
+- [0x10.Python相关](#0x10python相关)
+- [0x11.屏幕录制/截取](#0x11屏幕录制截取)
+- [0x12 渗透相关](#0x12-渗透相关)
+  - [内网穿透](#内网穿透)
+- [0x13 键盘映射](#0x13-键盘映射)
+<!--toc:end-->
+
 # Arch linux使用
 
 [toc]
@@ -177,6 +234,13 @@ rsync -P source destination     //其中-P与--partial --progress 选项的作�
 rsync source host:destination    //远程复制
 rsync host:destination destination   //远程复制
 ```
+
+## 查看当前文件夹大小
+使用
+```sh
+du -sh <path_to_dir>
+```
+这里的`-s`代表输出总计大小，`-h`代表以人类可读的方式列出
 
 
 
@@ -384,6 +448,14 @@ awk '{print $1}' 		//打印输入信息的第一列
 break filename:line_number
 ```
 
+如果我们想要在多进程调试,可以尝试下面的指令
+
+```
+set follow-fork-mode child/parent  //设置fork后跟进子进程还是父进程
+info inferior 						//显示多进程信息
+inferior ** 					//切换调试进程
+```
+
 
 
 
@@ -453,14 +525,29 @@ xlsclients
 - `-c`:生成目标文件obj
 - `-o`:生成可执行文件
 - `-S`:生成汇编代码
-- `gcc --verbose test.c ./glibc-2.31.so -o test`：glibc2.34以上若想编译低版本，可采用此法
+- `gcc --verbose test.c ./glibc-2.31.so -o test`：glibc2. 34以上若想编译低版本，可采用此法
 - `-ftest-coverage`: 编译程序可以生成覆盖率文件,然后运行文件后可以看到执行了哪些文件
+- `-fsanitize=address`:开启Asan
+- `--coverage`:开启覆盖率，可以结合lcov使用
 
 如果想静态链接静态库的话,如下使用
 
 ```
 gcc test.c -o test -L/path/to/library -l:mylib.a
 ```
+
+如果希望修改gcc版本
+```sh
+# 添加选项
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 70
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 50
+# 更新默认
+sudo update-alternatives --config gcc
+```
+
+
+
+
 
 ## strip
 用来去除符号表，用法如下：
@@ -655,7 +742,49 @@ $ wf-recorder --audio -o file_name -g "$(slurp)"
 	名称：bluez_sink.CC_14_BC_B5_89_61.a2dp_sink.monitor
 ```
 
+# 0x12 渗透相关
+
+## 内网穿透
+
+首先到云服务器主机开放一个端口<external_server_port>用来做映射
 
 
 
+然后内网主机执行命令
+
+```
+ssh -R -N -f
+<external_server_port>:internel_server_ip/:<internel_server_port> user@external_server
+```
+
+
+
+这里-N表示不进入执行命令模式
+
+-f表示在后台运行ssh会话
+
+
+
+最后到任意主机执行相关命令(如果映射的是内网主机的22端口的花就可以进行远程连接)
+
+```
+ssh -p <external_server_port> local_user@external_server
+```
+
+
+# 0x13 键盘映射
+
+```shell
+cat /usr/share/X11/xkb/rules/base.lst
+```
+
+查看上述文件
+
+# 0x14 Git
+
+如果一个项目有多层子项目,用下面的选项来嵌套下载
+
+```
+git clone --recurse-submodules https://github.com/libbpf/libbpf-bootstrap.git
+```
 
