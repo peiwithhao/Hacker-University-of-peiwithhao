@@ -28,5 +28,5 @@ afl-fuzz -i in -o out -S <slaven_name> -- <target> @@
 ```
 这里需要注意我们只有一个主模式进程，单可以有多个从模式进程
 
-![multifuzzer](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/img/multifuzzer.png)
+![multifuzze](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/img/multifuzzer.png)
 
