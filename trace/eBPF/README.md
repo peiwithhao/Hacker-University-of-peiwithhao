@@ -32,7 +32,7 @@ libbpf是一个用来方便用户编写eBPF程序的库函数框架,因此里面
 
 # trace point
 
-其中挂载点可以到`/sys/kernel/debug/tracing/available_event`中查询到
+其中挂载点可以到`/sys/kernel/debug/tracing/available_events`中查询到
 
 # libbpf-bootstrap讲解
 讲解框架
