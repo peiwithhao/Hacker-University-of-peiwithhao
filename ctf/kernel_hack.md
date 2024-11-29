@@ -1,4 +1,4 @@
-# Common Cross cache attack
+# Advancing Cross cache attack
 首先讲解普通的`cross cache attack`, 该攻击主要是针对于专有`kmem_cache`的利用
 
 在Black hat 2024 asia会议中提到在传统cross cache attack中可能会遇到两种挑战：
@@ -53,16 +53,58 @@
 
 那么低order如何能被高order所使用呢，唯一的可能就是当低order的slab和其物理相邻的slab均被释放时（这里实际上一个slab都通过算法对应另一个slab,所以不存在3个物理相邻则合并3个的情况）, 低order则可以合并为高order
 
+
+
 因此想要达成这种效果，需要我们进行堆风水进行修改
 1. 首先将进程绑定到cpu0
 2. 分配足够的`order-0`页面，数量需要满足能够将其全部释放时能出发pcplist的刷新,而选择的结构体需要满足下面几点：
     1. 在分配的时候，需要该结构体能够被大量分配并且是从`free_area`开始分配,
     2. 在释放的时候，需要是同步的释放，这里选择到了Pipe
-3. 从UNMOVABLE分配物理连续的`order-0 pages`
-4. 
+3. 从UNMOVABLE分配物理连续的`order-0 pages`,分配的object除了满足上述条件，还需要能够部分释放并且分配过程中少量噪音
+4. 由与是物理连续，且需要`order-3 pages`复用`order-0 pages`,因此我们可以分配多个pipe,而每个pipe占有2^3个page,如下:
+![allocated pipes](../img/pipe_phys.png)
+5. 然后我们就可以在每个pipe所占有的pages中释放第一个pages,这样这些pages,或者说`order-0 slab`就将会置入`pcplist/per_cpu_pages`链表当中
+![page_hole](../img/page_hole.png)
+6. 使用之前的条件竞争用`victim_object`占据其中一个`page_hole`,然后将其他的`page_hole`占满，此时一定时间后该`victim_object`所占领的slab将会被清空,而这里占领其他的`page_hole`中选取结构体为`ION`
+7. 之后释放掉其他所有的pipe页面，这样就会造成一定存在`order-3`的页面包含住`victim object`,这样就可以使得我们的`order-3`复用`order-0`
+![order3](../img/order3.png)
 
 
+这里还存在一些基础的知识,在我们分配/释放`order-0`slab的时候，首先会从`pcplist/per_cpu_pages`当中分配/释放,这个链表是`FIFO`的，且当他flusshing是从栈底开始刷新
+最后还有一个问题，那就是如何分配大量物理连续的页面,这里使用的方法是首先大量分配page页面，同时从内核分配(`alloc_pages()`)和从用户分配(`mmap()`),这样能使得其能使得内存空间处于高水位线下，然后出发`kswapd`线程来回收页面，我们可以从`cat /proc/meminfo`中轮询探测是否满足我们需要的条件，那就是下次分配order-0必定会从较高order的slab中分配，这样以来就能保证我们所分配的slab都是物理连续的
 
+# PageJack: Page-Level UAF
+
+在往后面看的时候我发现这个技术实际上已经出来较久了，经过搜索证明确实有师傅已经在题目中适用了，所以下面的部分仅当巩固一遍知识
+
+这篇议题所讨论的动机是近年来由于CFI(Control-Flow Intergrity, 控制流完整性)的出现导致劫持程序控制流越来越困难
+相反`data-only attack`近年来则水涨船高，利用方式层出不穷
+一般来说`data-only attack`所瞄准的资源有两种，一种为内核全局变量(`modeprobe_path`)，另一种则为内核堆变量(`cred`)
+
+对于全局变量来说一般需要下面的利用条件：
+1. 绕过KASLR
+2. 任意地址写
+3. 启用`CONFIG_STATIC_USERMODEHELPER`
+
+而对于内核堆变量则需要下面的利用条件：
+1. 堆空间的相对写
+2. 不需要任意地址写
+
+而现在所面临的问题就是在以前堆空间的变量基本都从普通cache中分配,但现在很多变量都来自于专有的cache
+这样当我们面临一个OOB漏洞的时候就面临了两个挑战：
+1. 如何将UAF对象和关键对象串联起来，也就是说利用OOB来覆盖
+2. 如何在不造成副作用的情况下破坏victim object
+
+## 挑战一
+可以利用Cross cache attack 加上堆风水来进行利用,这里研究员所采取的方案即为传统的cross cache attack,这里就不再细说
+
+## 挑战二
+这个挑战需要我们满足在覆盖指定字段,但不能破坏其他内容
+当然这一点在以往也有解决方案,那就是需要在我们的利用过程中添加额外的信息泄漏步骤,有可能还需要泄漏KASLR偏移
+
+而在`io_uring`开始支持创建的`ring_buffer`可以由用户使用`mmap`访问的时候，可能会导致一种情况，那就是当使用内核提供的接口`io_uring_register`注册了一个ringbuffer, 且之后用户使用mmap映射，然后再次调用`io_uring_register`的其他选项来解除该`ringbuffer`,这就导致用户可能通过mmap访问到已经被释放的`free pages`
+
+而在演讲ppt里面介绍了一个例子那就是如果存在OOB,则在`victim object`周围分配大量`page_buffer`,知道dirty pipe的老铁们对这个结构体比较熟悉，他的每一个buffer都会指向一个`struct page`指针，也就对应一个page,因此我们可以通过OOB复写`pipe_buffer`的开头指针来将struct page *指针来劫持成别的指针，这里由于`struct page`大小为0x40,所以本身不会有太多可能性,所以我们只需要复写其中低8字节即可
 
 
 
@@ -72,9 +114,14 @@
 
 # 配置释义
 + `CONFIG_RANDOM_KMALLOC_CACHES`:从4.14.327开始，对于正常的kmalloc的分配创建多个`slab cache`的副本，kmalloc会根据代码在其中随机选择一个,现在副本数量默认设置为16
++ `CONFIG_STATIC_USERMODEHELPER`:默认情况下内核可以通过`Usermode helper`来调用许多不同的用户空间二进制程序，设置此项目即为禁用所有USERMODE HELPER程序,同时需要将`STATIC_USERMODEHELPER_PATH`设置为空字符串
++ `CONFIG_SLAB_VIRTUAL`:Google所提出的使用内核虚拟地址来分配slab，且需要确保分配的该slab不会复用其他的slab
++ `CONFIG_INIT_ON_FREE_DEFAULT_ON`:效果等同于`init_on_free = 1`,可以使用`init_on_free =0 `来禁用，释放page后将会清空其内容,但可能造成较高负载
+
+
+
 
 [config释义](https://www.kernelconfig.io/index.html)
-
 
 
 
