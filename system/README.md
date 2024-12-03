@@ -247,7 +247,180 @@ sysfs提供两种判断文件是否可见：
 1. 属性组文件所在的kobject的namespace
 2. 属性组文件的`is_visible`机制，该机制用于确定该属性组文件是否对用户空间可见
 
+## 源码解读
+就仅拿proc伪文件系统当作例子，在内核启动阶段会默认使用该fs
+源码调用链首先从`start_kernel()`开始,
+`start_kernel()`是用来进行一些内核初始化工作，例如初始化`cgroup, page_alloc`
+```c
+asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
+{
+	char *command_line;
+	char *after_dashes;
+    ...
+    proc_root_init();
+    ...
+}
+```
+在`proc_root_init()`函数中所进行的操作分为以下几个步骤：
+```link
+proc_root_init()
+    proc_init_kmemcache()    //创建proc相关的一些专有缓存池
+    proc_sys_init()          //初始化/proc/sys/*, 这里面是sysctl所使用到的部分
+    register_filesystem(&proc_fs_type) //向全局文件系统列表中注册,保存到file_system的全局链表中
+    
+```
 
+其中`proc_fs_type`为一个全局变量
+```c
+static struct file_system_type proc_fs_type = {
+	.name			= "proc",
+	.init_fs_context	= proc_init_fs_context,
+	.parameters		= proc_fs_parameters,
+	.kill_sb		= proc_kill_sb,
+	.fs_flags		= FS_USERNS_MOUNT | FS_DISALLOW_NOTIFY_PERM,
+};
+```
+在这之后用户就可以通过调用`mount -t proc /dev/null /proc`挂载文件系统
+
+这里讲解一下mount的大致步骤：
+首先就是`__x64_sys_mount()`函数
+```c
+SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
+		char __user *, type, unsigned long, flags, void __user *, data)
+{
+    ...
+	ret = do_mount(kernel_dev, dir_name, kernel_type, flags, options);
+    ...
+}
+```
+这里只关注主要的部分，这里的`do_mount`是进行mount的主体部分
+
+```c
+
+struct path {
+	struct vfsmount *mnt;
+	struct dentry *dentry;
+} __randomize_layout;
+
+long do_mount(const char *dev_name, const char __user *dir_name,
+		const char *type_page, unsigned long flags, void *data_page)
+{
+	struct path path;
+    ...
+	ret = path_mount(dev_name, &path, type_page, flags, data_page);
+	path_put(&path);
+	return ret;
+}
+```
+这里的`vfsmount`表示了当前用户传入的挂载点信息,
+然后同`struct dentry`作为`sturct path`结构体传入给下一个函数`path_mount()`
+
+```c
+int path_mount(const char *dev_name, struct path *path,
+		const char *type_page, unsigned long flags, void *data_page)
+{
+    ...
+	return do_new_mount(path, type_page, sb_flags, mnt_flags, dev_name,
+			    data_page);
+}
+```
+省略的代码是一些flags的设置我们暂时按下不表,主要集中在`do_new_mount()`
+
+```c
+static int do_new_mount(struct path *path, const char *fstype, int sb_flags,
+			int mnt_flags, const char *name, void *data)
+{
+	struct file_system_type *type;
+	struct fs_context *fc;
+	const char *subtype = NULL;
+	int err = 0;
+
+	if (!fstype)
+		return -EINVAL;
+
+	type = get_fs_type(fstype); //获取上面在初始化文件系统的时候连接到file_system的类型变量
+	if (!type)
+		return -ENODEV;
+
+	if (type->fs_flags & FS_HAS_SUBTYPE) {
+		subtype = strchr(fstype, '.');
+		if (subtype) {
+			subtype++;
+			if (!*subtype) {
+				put_filesystem(type);
+				return -EINVAL;
+			}
+		}
+	}
+
+	fc = fs_context_for_mount(type, sb_flags);  //这里就是调用fs_type->init_fs_context来构造fs_context
+	put_filesystem(type);
+	if (IS_ERR(fc))
+		return PTR_ERR(fc);
+
+	if (subtype)
+		err = vfs_parse_fs_string(fc, "subtype",
+					  subtype, strlen(subtype));
+	if (!err && name)
+		err = vfs_parse_fs_string(fc, "source", name, strlen(name));
+	if (!err)
+		err = parse_monolithic_mount_data(fc, data);
+	if (!err && !mount_capable(fc))
+		err = -EPERM;
+	if (!err)
+		err = vfs_get_tree(fc);
+	if (!err)
+		err = do_new_mount_fc(fc, path, mnt_flags);
+
+	put_fs_context(fc);
+	return err;
+}
+```
+上面函数所做的东西如下：
+1. 调用`get_fs_type(fstype)`来获取`struct file_system_type proc_fs_type`;
+2. 调用`fs_context_for_mount(type, sb_flags)`来分配`fs_context`,
+并且内容包括`ops`等被`proc_init_fs_context()`函数所初始化,赋予`fc->ops = proc_fs_context_ops`,内容如下:
+```c
+static const struct fs_context_operations proc_fs_context_ops = {
+	.free		= proc_fs_context_free,
+	.parse_param	= proc_parse_param,
+	.get_tree	= proc_get_tree,
+	.reconfigure	= proc_reconfigure,
+};
+```
+3. 中间省略一部分检查，假设我们均通过，调用`vfs_get_tree(fc)`,
+该函数的功能就是获取可以mount的root,在这个函数中首先需要调用`fc->ops->get_tree(c)`,在这里就是`proc_get_tree(fc)`函数,在下面的步骤讲解
+    1. 这个函数是`get_tree_nodev(fc, proc_fill_super)`的wrapper
+    2. 上面的函数又是`vfs_get_super(fc, vfs_get_independent_super, fill_super)`的wrapper
+    3. 调用`sget_fc()`函数来创建一个新的匿名`super_block`,注意后来所有的`alloc_inode`类的函数都是从里面调用，~~inode也都换成了`struct proc_inode`~~,说错了应该是返回的仍然是普通inode,只不过`proc_inode`里面包含`inode`
+    4. 调用`fill_super`,也就是`proc_fill_super()`来填充这个`super_block`,例如`s_ops = proc_sops`等等
+    5. 上面的函数除了填充一些标志位， 还需要调用`proc_get_inode(s, &proc_root)`,来获取`root_inode`,这个`&proc_root`是一个全局变量`struct proc_dir_entry proc_root`,代表了`/proc`的`dentry`
+    6. 最后将`fc->root = dget(sb->s_root)`,也就是指向了刚刚创建的`root_inode`所对应的`dentry`
+4. 调用`do_new_mount_fc()`,这个函数主要是使用一个superblock来创建新的mount结构体
+    1. 调用`vfs_create_mount()`来创建`vfsmount`,在过程中会赋值`mnt->mnt_mountpoint = mnt->mnt.mnt_root`,也就是`root_inode`所对应的dentry
+    2. 将该挂载点连接到双链表， `mnt->mnt.mnt_sb->s_mounts`当中
+    3. 调用`do_add_mount()`函数将这个mount添加到命名空间的`mount tree`当中，
+
+上面存在没讲详细的一点，那就是在调用`proc_fill_super()`函数过程中，在填充了`superblock`之后，还需要获取`root_inode`,这个时候是使用`proc_get_inode()`函数，在这个函数当中不止调用了`sb->alloc_inode`,同时还对传回来的inode做出了一些初始化的工作,例如：
+`inode->i_fop = &proc_reg_file_ops`
+
+```c
+/*
+ * This is the root "inode" in the /proc tree..
+ */
+struct proc_dir_entry proc_root = {
+	.low_ino	= PROC_ROOT_INO, 
+	.namelen	= 5, 
+	.mode		= S_IFDIR | S_IRUGO | S_IXUGO, 
+	.nlink		= 2, 
+	.refcnt		= REFCOUNT_INIT(1),
+	.proc_iops	= &proc_root_inode_operations, 
+	.proc_dir_ops	= &proc_root_operations,
+	.parent		= &proc_root,
+	.subdir		= RB_ROOT,
+	.name		= "/proc",
+};
+```
 
 
 # 引用

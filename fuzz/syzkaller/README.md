@@ -51,7 +51,8 @@ $ wget https://raw.githubusercontent.com/google/syzkaller/master/tools/create-im
 $ chmod +x create-image.sh
 $ ./create-image.sh
 
-```
+
+
 在构建起磁盘镜像后我们就可以使用qemu来启动
 ```shell
 
