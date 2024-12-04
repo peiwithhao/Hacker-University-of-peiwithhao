@@ -1,15 +1,80 @@
 <!--toc:start-->
-- [!.生成LLVM IR](#生成llvm-ir)
-- [@.LLVM IR语法](#llvm-ir语法)
-- [\#.LLVM IR内存模型](#llvm-ir内存模型)
-- [$. IR层次优化](#ir层次优化)
-  - [$.!. ImmutablePass class](#immutablepass-class)
-  - [$.@. ModulePass class](#modulepass-class)
-  - [$.\#. The CallgraphSCCPass class](#the-callgraphsccpass-class)
-  - [$.$. FunctionPass class](#functionpass-class)
-- [\%. LLVM Pass 编写](#llvm-pass-编写)
-- [((.引用](#引用)
+- [0.前端](#0前端)
+- [1.生成LLVM IR](#1生成llvm-ir)
+- [2.LLVM IR语法](#2llvm-ir语法)
+- [3.LLVM IR内存模型](#3llvm-ir内存模型)
+- [4. IR层次优化](#4-ir层次优化)
+  - [4.1. ImmutablePass class](#41-immutablepass-class)
+  - [4.2. ModulePass class](#42-modulepass-class)
+  - [4.3. The CallgraphSCCPass class](#43-the-callgraphsccpass-class)
+  - [4.4. FunctionPass class](#44-functionpass-class)
+- [5. LLVM Pass 编写](#5-llvm-pass-编写)
+- [编译Linux内核](#编译linux内核)
+- [引用](#引用)
 <!--toc:end-->
+
+# 0.前端
+## 0.1. clang一把梭哈
+
+LLVM前端的工具套件基本给`clang`包圆，设计之初他是仿照着gcc的编译规则所以用起来十分类似，考虑下面一个代码：
+```c
+#include <stdio.h>
+int main(){
+    int a = 0;
+    return a;
+}
+```
+编译可以考虑`clang hello.c -o ./hello`
+同时我们可以考虑附带`-###`参数来看清楚在后续编译程序时调用了多少工具
+
+## 0.2. 独立工具的使用
+这里根据官方中文文档来熟悉一些各个套件的使用
+考虑下面这样一个程序`hello.c, sum.c`
+```c
+//hello.c
+#include <stdio.h>
+
+int sum(int a, int b);
+
+int main(){
+    int c = sum(2, 4);
+    printf("sum :%d\n", c);
+    return 0;
+}
+
+//sum.c
+int sum(int a, int b){
+    return a + b;
+}
+```
+虽然使用`clang main.c sum.c -o sum`能实现同样的结果，但是我们也可以使用独立的工具
+这是生成了LLVM bitcode文件
+```sh
+clang -emit-llvm -c main.c -o main.bc
+clang -emit-llvm -c sum.c -o sum.bc
+```
+同样可以添加`-S`参数来生成人类可读的汇编形式
+```sh
+clang -emit-llvm -S -c main.c -o main.ll
+clang -emit-llvm -S -c sum.c -o sum.ll
+```
+之后我们拥有两种方法来生成目标文件：
+
+第一种就是可以使用系统链接器生成目标文件
+```sh
+llc -filetype=obj main.bc -o main.o
+llc -filetype=obj sum.bc -o sum.o
+clang main.o sum.o -o sum_app
+```
+第二种就是使用bitcode来进行链接，然后生成目标文件
+```sh
+llvm-link main.bc sum.bc -o sum_app_linked.bc
+llc -filetype=obj sum_app_linked.bc -o sum_app_linked.o
+clang sum_app_linked.o -o sum_app_linked
+```
+第二种的优势就在于可以在`sum_app_linked.bc`的时候使用opt工具对程序IR进行优化
+
+
 
 # 1.生成LLVM IR
 用下列例子来说明如何将C代码转换为LLVM IR
@@ -260,12 +325,13 @@ $ make LLVM=1 -j<your cores_nr>
 $ export LLVM_COMPILER=clang
 ```
 然后我们进入到下载到的linux源码目录
+
 ```c
 make CC=clang defconfig # 默认配置
 make CC=wllvm LLVM=1 #开始编译
 ```
 
-# ((.引用
+# 引用
 [LLVM-CORE](https://getting-started-with-llvm-core-libraries-zh-cn.readthedocs.io/zh-cn/latest/ch05.html)
 [Value API](https://llvm.org/doxygen/classllvm_1_1Value.html)
 [使用LLVM编译Linux内核](https://www.kernel.org/doc/html/latest/kbuild/llvm.html)
