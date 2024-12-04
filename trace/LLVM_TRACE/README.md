@@ -11,7 +11,7 @@
 - [((.引用](#引用)
 <!--toc:end-->
 
-# !.生成LLVM IR
+# 1.生成LLVM IR
 用下列例子来说明如何将C代码转换为LLVM IR
 ```c
 int sum(int a, int b){
@@ -73,7 +73,7 @@ ector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cmov,+cx8,
 ```sh
 $ llvm-extract -func=sum c2ir.bc -o c2ir.bc
 ```
-# @.LLVM IR语法
+# 2.LLVM IR语法
 
 ```LLVM
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128
@@ -163,7 +163,7 @@ ector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cmov,+cx8,
   %3 = add nsw i32 %1, %0
   ret i32 %3
 ```
-# \#.LLVM IR内存模型
+# 3.LLVM IR内存模型
 + Module: 聚合整个翻译单元所用到的所有数据,声明了Module::iterator typedef,作为遍历这个模块中的函数的简便方法,可以用begin()和end()方法获取这些迭代器,可以在这些[Module API](https://llvm.org/doxygen/classllvm_1_1Module.html)查看
 + Function: 包含有关函数定义和声明的所有对象,对于声明来说,它仅包含函数圆形,无论定义或者声明,它都包含函数参数的列表,可以通过getArgumentList()方法或者arg_begin()和arg_end()这对方法来访问
 
@@ -180,16 +180,16 @@ Function和Instruction同时是Value和User的子类,而BasicBlock只是Value的
 
 + User: User类定义了op_begin()和op_end()方法,让你能够快速访问所有它用到的Value接口,这里代表了use-def链条, 你也可以利用一个辅助函数,称之为replaceUsesOfWith(Value * From, Value *To),替换所有它用到的值,在[这里]https://llvm.org/doxygen/classllvm_1_1User.html)可以查看他的全部接口
 
-# $. IR层次优化
+# 4. IR层次优化
 一旦我们构造出了LLVM IR,一个程序将受到各种各样的目标无关代码优化,优化可一次作用一个函数或一个模块
 
 我们所编写的LLVM passes都是Pass类的子类,一般存在`CallGraphSCCPass, FunctionPass, LoopPass, RegionPass`类,而选择继承哪个类来向系统表明你编写的Pass想要做什么
 下面介绍集中常见的类型
 
-## $.!. ImmutablePass class 
+## 4.1. ImmutablePass class 
 被称为最苍白和无聊得而类型, 通常表明该pass不是一定需要运行,不会改变状态并且绝不会被更新, 虽然这个pass类很少被使用,但是对于提供当前编译机器信息和起他可以影响动态翻译的静态信息来说是重要的,
 
-## $.@. ModulePass class
+## 4.2. ModulePass class
 最普遍的一个类型,继承该类表明你的passs使用整个程序作为一个单元,以不可预测的顺序来引用函数体, 或添加和删除函数
 要写一个正确的ModulePass class, 我们需要继承ModulePass 并且覆盖`runOnModule`方法
 
@@ -198,7 +198,7 @@ virtual bool runOnModule(Module &M) = 0;
 ```
 该方法在模块被翻译修改后返回True, 其他情况则返回False
 
-## $.\#. The CallgraphSCCPass class
+## 4.3. The CallgraphSCCPass class
 通常被用来遍历程序从下到上的调用图,如果你编写的Pass符合以下的需求,并且不符合functionPass的需求,则应该继承CallGraphSCCPass
 下面介绍一些方法:
 `doInitialization(CallGraph &)method`
@@ -217,7 +217,7 @@ virtual bool doFinalzation(CallGraph &CG) = 0;
 ```
 该函不常用,只有当pass的框架完成了正在编译的程序中每个SCC的runOnSCC函数之后才会被调用
 
-## $.$. FunctionPass class
+## 4.4. FunctionPass class
 与ModulePass class相反, FunctionPassClass 的子类通常是可预测的
 
 简单来说,该类不能做以下事情:
@@ -241,7 +241,7 @@ virtual bool doFinalzation(CallGraph &CG) = 0;
 ```
 最后调用同上
 
-# \%. LLVM Pass 编写 
+# 5. LLVM Pass 编写 
 首先下载github的库:
 
 
