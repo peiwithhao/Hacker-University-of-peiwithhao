@@ -392,8 +392,9 @@ static const struct fs_context_operations proc_fs_context_ops = {
 该函数的功能就是获取可以mount的root,在这个函数中首先需要调用`fc->ops->get_tree(c)`,在这里就是`proc_get_tree(fc)`函数,在下面的步骤讲解
     1. 这个函数是`get_tree_nodev(fc, proc_fill_super)`的wrapper
     2. 上面的函数又是`vfs_get_super(fc, vfs_get_independent_super, fill_super)`的wrapper
-    3. 调用`sget_fc()`函数来创建一个新的匿名`super_block`,注意后来所有的`alloc_inode`类的函数都是从里面调用，~~inode也都换成了`struct proc_inode`~~,说错了应该是返回的仍然是普通inode,只不过`proc_inode`里面包含`inode`
-    4. 调用`fill_super`,也就是`proc_fill_super()`来填充这个`super_block`,例如`s_ops = proc_sops`等等
+    3. 调用`sget_fc()`函数来创建一个新的匿名`super_block`, 这里创建完sb后会将其链接到内核全局变量`super_blocks`当中
+    4. 调用`fill_super`,也就是`proc_fill_super()`来填充这个`super_block`,例如`s_ops = proc_sops`等等,注意后来所有的`alloc_inode`类的函数都是从里面调用，~~inode也都换成了`struct proc_inode`~~,说错了应该是返回的仍然是普通inode,只不过`proc_inode`里面包含`inode`
+
     5. 上面的函数除了填充一些标志位， 还需要调用`proc_get_inode(s, &proc_root)`,来获取`root_inode`,这个`&proc_root`是一个全局变量`struct proc_dir_entry proc_root`,代表了`/proc`的`dentry`
     6. 最后将`fc->root = dget(sb->s_root)`,也就是指向了刚刚创建的`root_inode`所对应的`dentry`
 4. 调用`do_new_mount_fc()`,这个函数主要是使用一个superblock来创建新的mount结构体
@@ -421,6 +422,11 @@ struct proc_dir_entry proc_root = {
 	.name		= "/proc",
 };
 ```
+## 总结
+最后总结一下任何文件系统的初始化过程：
+1. 注册文件系统，最主要的那个是`struct file_system_type`,此时仅仅是将该结构体链接到全局链表
+2. 挂载文件系统，这个步骤需要到全局链表中寻找到文件系统类型`struct file_system_type`,然后调用其中的函数来新创建`super_block`,链接到全局链表,然后需要创建`root_inode,dentry`，然后将dentry中的相应字段指向`superblock`,然后创建挂载点`struct mount`并且链接到当前命名空间链表
+3. 最后当打开文件的时候，首先是从根`dentry`开始查找，然后找到目的文件的`dentry`和`inode`,然后填充创建的`struct file`数据结构并且返回
 
 
 # 引用
