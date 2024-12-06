@@ -14,7 +14,7 @@
 <!--toc:end-->
 
 # 0.前端
-## 0.1. clang一把梭哈
+## 0.1.clang一把梭哈
 
 LLVM前端的工具套件基本给`clang`包圆，设计之初他是仿照着gcc的编译规则所以用起来十分类似，考虑下面一个代码：
 ```c
@@ -27,7 +27,7 @@ int main(){
 编译可以考虑`clang hello.c -o ./hello`
 同时我们可以考虑附带`-###`参数来看清楚在后续编译程序时调用了多少工具
 
-## 0.2. 独立工具的使用
+## 0.2.独立工具的使用
 这里根据官方中文文档来熟悉一些各个套件的使用
 考虑下面这样一个程序`hello.c, sum.c`
 ```c
@@ -73,8 +73,6 @@ llc -filetype=obj sum_app_linked.bc -o sum_app_linked.o
 clang sum_app_linked.o -o sum_app_linked
 ```
 第二种的优势就在于可以在`sum_app_linked.bc`的时候使用opt工具对程序IR进行优化
-
-
 
 # 1.生成LLVM IR
 用下列例子来说明如何将C代码转换为LLVM IR
@@ -306,8 +304,120 @@ virtual bool doFinalzation(CallGraph &CG) = 0;
 ```
 最后调用同上
 
-# 5. LLVM Pass 编写 
-首先下载github的库:
+# 5.LLVM Pass 编写 
+本次的目的是首先获取一个程序的bitcode,
+然后使用Pass文件读入bitcode之后来获取他的函数相关信息
+
+## 5.1.编写Makefile
+Makefile主体内容如下：
+```Makefile
+LLVM_CONFIG?=llvm-config
+
+ifndef VERBOSE
+	QUIET:=@
+endif
+
+SRC_DIR?=$(PWD)
+LDFLAGS+=$(shell $(LLVM_CONFIG) --ldflags)
+COMMON_FLAGS=-Wall -Wextra
+CXXFLAGS+=$(COMMON_FLAGS) $(shell $(LLVM_CONFIG) --cxxflags)
+CPPFLAGS+=$(shell $(LLVM_CONFIG) --cppflags) -I$(SRC_DIR)
+
+HELLO=helloworld
+HELLO_OBJECTS=hello.o
+default: $(HELLO)
+
+%.o : $(SRC_DIR)/%.cpp
+	@echo Compiling $*.cpp
+	$(QUIET)$(CXX) -c $(CPPFLAGS) $(CXXFLAGS) $<
+
+$(HELLO) : $(HELLO_OBJECTS)
+	@echo Linking $@
+	$(QUIET)$(CXX) -o $@ $(CXXFLAGS) $(LDFLAGS) $^ `$(LLVM_CONFIG) --libs bitreader core support`
+
+clean:
+	$(QUIET)rm -f $(HELLO) $(HELLO_OBJECTS)
+```
+这里Makefile的整体流程是逐个生成当前目录下的*.cpp文件的中间表示*.o然后链接他们
+
+## 5.2.编写分析Pass
+
+紧接着我们就来编写第一个Pass代码
+我们先需要包含一些必要的头文件
+```cpp
+#include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/raw_os_ostream.h"
+#include "llvm/Support/Error.h"
+#include <iostream>
+#include <llvm/IR/BasicBlock.h>
+#include <memory.h>
+using namespace llvm;
+```
+
+然后我们就开始编写大致流程，这里因为版本原因笔者本地是`llvm-18`，而中文文档的API有一定滞后性，所以使用了新的方式进行重写
+```cpp
+/*
+ * 这里提供了一个命令行选项，名为Filename，需要提供一个bitcode文件名称，并且在命令行中的位置是重要的
+*/
+static cl::opt<std::string> FileName(cl::Positional, cl::desc("Bitcode file"), cl::Required);
+```
+首先定义一个命令行选项，用来将bitcode文件路径作为参数传入到Pass中
+
+```cpp
+int main(int argc, char** argv){
+    /* 实现命令行接口 */
+    cl::ParseCommandLineOptions(argc, argv, "LLVM's Hello world!!!");
+    /* 实例化一个LLVMContext对象来存放一次LLVM编译的数据 */
+    LLVMContext context;
+    std::string error;
+
+    /* 旧版本使用的是OwningPtr来智能化管理内存 */
+    ErrorOr<std::unique_ptr<MemoryBuffer>> BufferOrError = MemoryBuffer::getFile(FileName);
+    if(!BufferOrError){
+        errs() << "Error reading file: " << BufferOrError.getError().message() << "\n";
+        return 1;
+    }
+
+    /* 结果不是错误 */
+    std::unique_ptr<MemoryBuffer> mb = std::move(*BufferOrError);
+```
+这里是获取bitcode文件内容，拷贝到内存当中
+```cpp
+    Expected<std::unique_ptr<Module>> ModuleOrError = parseBitcodeFile(mb->getMemBufferRef(), context);
+    if(!ModuleOrError){
+        errs() << "Error parseing bitcode \n";
+        return 1;
+    }
+    /* 不是错误 */
+    std::unique_ptr<Module> m = std::move(*ModuleOrError);
+```
+然后解析bitcode文件，获取模块
+```cpp
+    /* 引用标准输出 */
+    raw_os_ostream O(std::cout);
+    for(Module::const_iterator i = m->getFunctionList().begin(), 
+        e = m->getFunctionList().end(); i != e; ++i){
+        if(!i->isDeclaration()){
+            O << i->getName() << " has " << i->size() << "basic block(s). \n";
+        }
+    }
+    return 0;
+}
+```
+最后遍历功能函数，获取函数块的数量,
+
+然后这里我们写一个程序然后编译成IR来进行分析即可
+```
+./helloworld many_blocks.bc
+```
+
+
+
 
 
 # 编译Linux内核
