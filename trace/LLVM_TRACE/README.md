@@ -304,7 +304,7 @@ virtual bool doFinalzation(CallGraph &CG) = 0;
 ```
 最后调用同上
 
-# 5.LLVM Pass 编写 
+# 5.LLVM 项目的编写 
 本次的目的是首先获取一个程序的bitcode,
 然后使用Pass文件读入bitcode之后来获取他的函数相关信息
 
@@ -340,9 +340,9 @@ clean:
 ```
 这里Makefile的整体流程是逐个生成当前目录下的*.cpp文件的中间表示*.o然后链接他们
 
-## 5.2.编写分析Pass
+## 5.2.编写分析LLVM
 
-紧接着我们就来编写第一个Pass代码
+紧接着我们就来编写第一个LLVM代码
 我们先需要包含一些必要的头文件
 ```cpp
 #include "llvm/Bitcode/BitcodeReader.h"
@@ -412,9 +412,30 @@ int main(int argc, char** argv){
 最后遍历功能函数，获取函数块的数量,
 
 然后这里我们写一个程序然后编译成IR来进行分析即可
-```
+```sh
 ./helloworld many_blocks.bc
 ```
+
+# 6.IR层次的优化
+分为编译时优化和链接时优化,编译时优化指的是在使用`clang、gcc`在命令行指定的参数`-O0, -O1`等等
+而链接时优化则是可以在中间代码例如`IR`上实行优化
+其中`opt`工具使用`-O0, -O1, -O2, -O3, -Os, -Oz`作为优化选项，clang额外支持-O4
+选项`-O3, -O4`是链接时优化`-flto`的同义词
+
+这里解释不同优化级别代表的含义：
++ O0:不做优化,编译最快，调试信息最丰富
++ O2:开启大部分优化  
++ O3:类似于O2,开启更多优化，可能产生更多代码来试图让程序运行更快
++ Os:额外减小代码长度
++ Oz:类似于Os
++ O4:开启链接时优化
++ O1:介于O0和O2之间
+
+可以使用opt来操作bitcode文件
+```sh
+opt -O3 many_blocks.bc -o many_blocks-O3.bc
+```
+也可以使用opt来应用个别的Pass文件
 
 
 
