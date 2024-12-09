@@ -1,5 +1,7 @@
 <!--toc:start-->
 - [0.前端](#0前端)
+  - [0.1.clang一把梭哈](#01clang一把梭哈)
+  - [0.2.独立工具的使用](#02独立工具的使用)
 - [1.生成LLVM IR](#1生成llvm-ir)
 - [2.LLVM IR语法](#2llvm-ir语法)
 - [3.LLVM IR内存模型](#3llvm-ir内存模型)
@@ -8,7 +10,10 @@
   - [4.2. ModulePass class](#42-modulepass-class)
   - [4.3. The CallgraphSCCPass class](#43-the-callgraphsccpass-class)
   - [4.4. FunctionPass class](#44-functionpass-class)
-- [5. LLVM Pass 编写](#5-llvm-pass-编写)
+- [5.LLVM 项目的编写](#5llvm-项目的编写)
+  - [5.1.编写Makefile](#51编写makefile)
+  - [5.2.编写分析LLVM](#52编写分析llvm)
+- [6.IR层次的优化](#6ir层次的优化)
 - [编译Linux内核](#编译linux内核)
 - [引用](#引用)
 <!--toc:end-->
@@ -436,6 +441,131 @@ int main(int argc, char** argv){
 opt -O3 many_blocks.bc -o many_blocks-O3.bc
 ```
 也可以使用opt来应用个别的Pass文件
+
+## 6.1.编写属于自己的Pass
+定制化自己的Pass, 我们需要首先找到合适的类型，这里按照中文文档写为`FunctionPass`,而写Pass你可以将其放置在llvm所位于的lib当中，但是这样你需要每次重新编译一次llvm,
+这无疑是十分耗费时间的，因此在这里选择将其编译为so文件
+
+本次实验使用版本为`llvm-18`,
+因此与中文llvm版本不兼容，
+传统的注册方式已经被废弃，新的插件接口实现是基于`PassManager`的
+```cpp
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Passes/PassPlugin.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/raw_ostream.h"
+
+using namespace llvm;
+
+/* 统计函数和参数 */
+namespace{
+    void visitor(Function &F) {
+        errs() << "Function name: " << F.getName() << "\n";
+        errs() << "Number of the arguments: " << F.arg_size() << "\n";
+    }
+
+    /* 新PM的实现 */
+    /* 继承自PassInfoMixin<>, 通过他来注册Pass */
+    struct FnArgCnt : PassInfoMixin<FnArgCnt> {
+        PreservedAnalyses run(Function &F, FunctionAnalysisManager &){
+            visitor(F);
+            return PreservedAnalyses::all();
+        }
+    /* 返回true说明该Pass必须被执行，不能被优化器跳过 */
+        static bool isRequired() {return true;}
+    };
+}//namespace
+
+
+/* 注册Pass */
+//-----------------------------------------------------------------------------
+// New PM Registration
+//-----------------------------------------------------------------------------
+llvm::PassPluginLibraryInfo getHelloWorldPluginInfo() {
+  return {LLVM_PLUGIN_API_VERSION, "FnArgCnt", LLVM_VERSION_STRING,
+          [](PassBuilder &PB) {
+            PB.registerPipelineParsingCallback(
+                [](StringRef Name, FunctionPassManager &FPM,
+                   ArrayRef<PassBuilder::PipelineElement>) {
+                  if (Name == "fnargcnt") {
+                    FPM.addPass(FnArgCnt());
+                    return true;
+                  }
+                  return false;
+                });
+          }};
+}
+
+// This is the core interface for pass plugins. It guarantees that 'opt' will
+// be able to recognize HelloWorld when added to the pass pipeline on the
+// command line, i.e. via '-passes=hello-world'
+extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
+llvmGetPassPluginInfo() {
+  return getHelloWorldPluginInfo();
+}
+```
+## 6.2.编写CMakeLists
+在这里选择使用`cmake`来生成Makefile而不是手动写入，其中详细语法可以在网上搜索得知
+```cmake
+cmake_minimum_required(VERSION 3.31.2)
+project(my-first-pass)
+
+#==========================
+# 1.加载LLVM CONFIGURATION
+#==========================
+# 设置其为有效的LLVM安装地点
+# 这里是设置LT_LLVM_INSTALL_DIR默认为"/usr"
+# CACHE PATH是指允许用户自行修改该路径，并且覆盖CMake的缓存
+# 比如可以利用-DLT_LLVM_INSTALL_DIR=/path/to/llvm
+set(LT_LLVM_INSTALL_DIR "/usr" CACHE PATH "LLVM installation directory")
+
+# 添加LLVMConfig.cmake到CMake 查询的路径
+# LLVMConfig.cmake提供了LLVM安装的详细信息，例如库路径、头文件路径、版本信息
+list(APPEND CMAKE_PERFIX_PATH "${LT_LLVM_INSTALL_DIR}/lib/cmake/llvm/")
+
+# CONFIG表示要求使用LLVMConfig.cmake
+find_package(LLVM CONFIG)
+
+if("${LLVM_VERSION_MAJOR}" VERSION_LESS 18)
+    message(FATAL_ERROR "Found LLVM ${LLVM_VERSION_MAJOR}, but need 18 or above")
+endif()
+
+# FnArgCnt 的头文件,添加到编译器-I搜索路径
+include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
+
+#===========================
+# 2.LLVM BUILD CONFIGURATION
+#===========================
+
+# 设置使用C++ 17标准
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "")
+
+# LLVM 普遍在无RTTI下构建
+if(NOT LLVM_ENABLE_RTTI)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}" -fno-rtti)
+endif()
+
+#================================
+# 3. 添加目标
+#================================
+
+
+# 添加动态库，名字为FnArgCnt
+add_library(FnArgCnt SHARED fn_arg_cnt.cpp)
+
+target_link_libraries(FnArgCnt "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+
+```
+然后之后我们就可以进行编译了
+```sh
+mkdir -p build && cd build && cmake ..
+make
+```
+然后利用上述命令生成的内容来执行脚本
+
+```sh
+opt -load-pass=./example/pass_example/build/libFnArgCnt.so -passes=fnargcnt -disable-output your_pass.ll
+```
 
 
 
