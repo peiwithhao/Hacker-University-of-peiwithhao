@@ -422,6 +422,12 @@ struct proc_dir_entry proc_root = {
 	.name		= "/proc",
 };
 ```
+最后就是`do_new_mount_fc()`这个函数做了一些关于挂载点的操作
+
+
+
+
+
 ## 总结
 最后总结一下任何文件系统的初始化过程：
 1. 注册文件系统，最主要的那个是`struct file_system_type`,此时仅仅是将该结构体链接到全局链表
@@ -431,5 +437,6 @@ struct proc_dir_entry proc_root = {
 
 # 引用
 [filesystem](qute://pdfjs/web/viewer.html?filename=tmplgnr5ptt_Linux.Virtual.Filesystem.pdf&file=&source=https://lrita.github.io/images/posts/filesystem/Linux.Virtual.Filesystem.pdf)
+[mountpoint](https://www.bilibili.com/opus/677932331134091304)
 
 

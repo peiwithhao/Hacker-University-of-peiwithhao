@@ -1,0 +1,7 @@
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/OpCodeCounter/build/CMakeFiles/intrinsics_gen.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/OpCodeCounter/build/CMakeFiles/omp_gen.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/OpCodeCounter/build/CMakeFiles/acc_gen.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/OpCodeCounter/build/CMakeFiles/RISCVTargetParserTableGen.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/OpCodeCounter/build/CMakeFiles/OpcodeCounter.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/OpCodeCounter/build/CMakeFiles/edit_cache.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/OpCodeCounter/build/CMakeFiles/rebuild_cache.dir

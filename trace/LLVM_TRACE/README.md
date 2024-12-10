@@ -567,6 +567,11 @@ make
 opt -load-pass=./example/pass_example/build/libFnArgCnt.so -passes=fnargcnt -disable-output your_pass.ll
 ```
 
+## 6.3.分析Pass和转换Pass
+一般转换Pass就比如我们刚刚写的部分，他需要继承自`PassInfoMixin`
+而分析Pass需要继承自`AnalysisInfoMixin`
+
+
 
 
 

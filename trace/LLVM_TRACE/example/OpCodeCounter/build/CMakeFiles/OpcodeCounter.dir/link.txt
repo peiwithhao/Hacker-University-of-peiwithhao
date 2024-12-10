@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -Wl,--dependency-file=CMakeFiles/OpcodeCounter.dir/link.d -shared -Wl,-soname,libOpcodeCounter.so -o libOpcodeCounter.so CMakeFiles/OpcodeCounter.dir/OpcodeCounter.cpp.o
