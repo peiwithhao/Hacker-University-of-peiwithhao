@@ -75,7 +75,8 @@ PassPluginLibraryInfo getFindFCmpEqPluginInfo(){
                 });
             PB.registerPipelineParsingCallback(
                 [&](StringRef Name, FunctionPassManager &FPM, ArrayRef<PassBuilder::PipelineElement>){
-                    if(Name == PassArg){
+                    std::string PrinterPassElement = formatv("print<{0}>", PassArg);
+                    if(!Name.compare(PrinterPassElement)){
                         FPM.addPass(FindFCmpEqPrinter(llvm::outs()));
                         return true;
                     }

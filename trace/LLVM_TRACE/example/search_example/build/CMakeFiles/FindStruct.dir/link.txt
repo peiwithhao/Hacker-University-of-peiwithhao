@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -Wl,--dependency-file=CMakeFiles/FindStruct.dir/link.d -shared -Wl,-soname,libFindStruct.so -o libFindStruct.so CMakeFiles/FindStruct.dir/FindStruct.cpp.o
