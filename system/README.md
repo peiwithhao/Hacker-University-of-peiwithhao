@@ -432,7 +432,8 @@ struct proc_dir_entry proc_root = {
 最后总结一下任何文件系统的初始化过程：
 1. 注册文件系统，最主要的那个是`struct file_system_type`,此时仅仅是将该结构体链接到全局链表
 2. 挂载文件系统，这个步骤需要到全局链表中寻找到文件系统类型`struct file_system_type`,然后调用其中的函数来新创建`super_block`,链接到全局链表,然后需要创建`root_inode,dentry`，然后将dentry中的相应字段指向`superblock`,然后创建挂载点`struct mount`并且链接到当前命名空间链表
-3. 最后当打开文件的时候，首先是从根`dentry`开始查找，然后找到目的文件的`dentry`和`inode`,然后填充创建的`struct file`数据结构并且返回
+3. 这里注意当我们想要挂载一个文件系统，首先将挂载的dentry标记为已挂载,然后创建新的挂载文件系统的根`dentry`再创建`mount, vfsmount`来指向该根dentry,然后将mount链接全局链表和连接父mount,之后当我们遍历文件系统，看到某个`dentry`为挂载点，则通过hash搜索找到所挂载文件系统的`mount`,然后顺势找到文件系统的根dentry
+4. 最后当打开文件的时候，首先是从根`dentry`开始查找，然后找到目的文件的`dentry`和`inode`,然后填充创建的`struct file`数据结构并且返回
 
 
 # 引用

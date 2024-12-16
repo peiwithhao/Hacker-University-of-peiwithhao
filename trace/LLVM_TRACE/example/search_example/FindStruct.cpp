@@ -17,12 +17,13 @@ using namespace llvm;
 
 static void printStructTypes(raw_ostream &OS, Module &M){
     OS << "ModuleName:" << M.getName() << "\n";
+
     OS << "ID:" << M.getModuleIdentifier() << "\n";
+
     OS << "InstructionCount:" << M.getInstructionCount() << "\n";
+
     OS << "Source File Name:" << M.getSourceFileName() << "\n";
-    if(M.globals().empty()){
-        OS << "variables is empty\n";
-    }
+
     OS <<"VariablesType    VarialblesName\n";
     for(GlobalVariable &var : M.globals()){
         OS << "\t\t" << *var.getType() <<  "\t\t" << var.getName() << "\n";
@@ -38,13 +39,13 @@ static void printStructTypes(raw_ostream &OS, Module &M){
     }
 
     for(auto &F : M.getFunctionList()){
-        OS <<"======================\n";
+        OS << "=========Instructions===========\n";
         for(llvm::Instruction &Inst : instructions(F)){
             if(auto *Call = dyn_cast<CallInst>(&Inst)){
                 Function *Callee = Call->getCalledFunction();
                 OS << "Found Caller:" << F.getName() << " calls " << Callee->getName() << "\n";
             }else{
-            OS << "Regular Instruction:" << Inst << "\n";
+                OS << "Regular Instruction:" << Inst << "\n";
             }
         }
     }
