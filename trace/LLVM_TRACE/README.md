@@ -571,7 +571,7 @@ opt -load-pass=./example/pass_example/build/libFnArgCnt.so -passes=fnargcnt -dis
 一般转换Pass就比如我们刚刚写的部分，他需要继承自`PassInfoMixin`
 而分析Pass需要继承自`AnalysisInfoMixin`
 
-## 7.寻找特定结构体
+# 7.寻找特定结构体
 首先看一下在llvm ir中struct结构体的表示形式
 ```c
 #include <stdio.h>

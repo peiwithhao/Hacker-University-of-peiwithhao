@@ -172,7 +172,12 @@ pacman -S package-name --overwrite /usr/bin/libsndio.so
 $_ pacman -S package-name --overwrite '*'
 
 ```
+包的降级
+```
+ls /var/cache/pacman/pkg/<pacakge_name>     # 寻找以往缓存的包版本
+sudo pacman -U /var/cache/pacman/pkg/<pacakge_name> # 回退以往版本
 
+```
 
 
 # 0x03.网络管理
@@ -787,4 +792,26 @@ cat /usr/share/X11/xkb/rules/base.lst
 ```
 git clone --recurse-submodules https://github.com/libbpf/libbpf-bootstrap.git
 ```
+# 0x15 tmux
+如果想要复制，可以使用快捷键`ctrl+b [`来开启复制模式，然后`ctrl+b ]`来粘贴
+
+# 0x16 firewalld
+## 区域zone
+这里区域是一系列可用于指定接口的规则
+可以通过`firewall-cmd --get-active-zones`来查看当前区域
+
+更改接口区域
+```sh
+$ firewall-cmd --zone=zone --change-interface=interface_name
+```
+其中zone是你想切换到的区域，而`interface_name`则是你想要修改的网卡接口
+
+# 0x17 hyprpaper
+可以先通过`hyprctl`来修改壁纸
+```sh
+hyprctl hyprpaper preload "~/Pictures/nice_picture/wallhaven-8oy8yk.jpg"
+hyprctl hyprpaper wallpaper "eDP-1,~/Pictures/nice_picture/wallhaven-8oy8yk.jpg"
+```
+
+
 
