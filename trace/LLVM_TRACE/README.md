@@ -564,7 +564,7 @@ make
 然后利用上述命令生成的内容来执行脚本
 
 ```sh
-opt -load-pass=./example/pass_example/build/libFnArgCnt.so -passes=fnargcnt -disable-output your_pass.ll
+opt --load-pass-plugin=./example/pass_example/build/libFnArgCnt.so -passes=fnargcnt -disable-output your_pass.ll
 ```
 
 ## 6.3.分析Pass和转换Pass
