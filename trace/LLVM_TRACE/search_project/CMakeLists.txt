@@ -9,6 +9,7 @@ project(my-first-pass-searcher)
 # CACHE PATH是指允许用户自行修改该路径，并且覆盖CMake的缓存
 # 比如可以利用-DLT_LLVM_INSTALL_DIR=/path/to/llvm
 set(LT_LLVM_INSTALL_DIR "/usr" CACHE PATH "LLVM installation directory")
+set(PROJECT_INCLUDE "./include/" CACHE PATH "Project include directory")
 
 # 添加LLVMConfig.cmake到CMake 查询的路径
 # LLVMConfig.cmake提供了LLVM安装的详细信息，例如库路径、头文件路径、版本信息
@@ -23,6 +24,7 @@ endif()
 
 # FnArgCnt 的头文件,添加到编译器-I搜索路径
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
+include_directories(${PROJECT_INCLUDE})
 
 #===========================
 # 2.LLVM BUILD CONFIGURATION

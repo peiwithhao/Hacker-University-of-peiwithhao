@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = -DFindSpecificStruct_EXPORTS
 
-CXX_INCLUDES = 
+CXX_INCLUDES = -I/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/search_project/./include
 
 CXX_FLAGS = -fPIC
 

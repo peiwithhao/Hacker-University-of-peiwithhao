@@ -265,6 +265,9 @@ PKG_CONFIG_ARGN:STRING=
 //pkg-config executable
 PKG_CONFIG_EXECUTABLE:FILEPATH=/usr/bin/pkg-config
 
+//Project include directory
+PROJECT_INCLUDE:PATH=./include
+
 //Path to a library.
 Terminfo_LIBRARIES:FILEPATH=/usr/lib/libtinfo.so
 

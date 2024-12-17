@@ -14,6 +14,7 @@
 
 using namespace llvm;
 
+/* 寻找特定结构的数据结构体声明 */
 static auto findStruct(llvm::raw_ostream &OS, llvm::Module &M){
     std::vector<StructType *> Result;
     /* 获取数据结构体 */
@@ -26,35 +27,53 @@ static auto findStruct(llvm::raw_ostream &OS, llvm::Module &M){
         if(!ElementTypes.empty()){
             if(isa<PointerType>(ElementTypes[0])){
                 Result.push_back(T);
-                break;
+                continue;
             } 
         }
     }
     return Result;
-
 }
 
 static auto findUser(llvm::raw_ostream &OS, std::vector<StructType *> array, llvm::Module &M){
 
+    /* 遍历特殊结构体 */
     for(StructType *st : array){
-        OS << "Struct Specific Name : " << st->getName() << "\n";
+        OS << "\033[33mStruct Specific Name : " << st->getName() << "\033[0m\n";
+        /* 遍历每个函数 */
         for(auto &F : M.getFunctionList()){
+            OS << "\033[31m" <<F.getName() << "\033[0m\n";
+            /* 遍历函数指令 */
             for(Instruction &Inst : instructions(F)){
-                OS << "Inst: " << Inst.getOpcodeName() << "\n";
-                for(llvm::Value *Op : Inst.operands()){
-                    if(PointerType *pt = dyn_cast<PointerType>(Op->getType())){
-                        if(Op->getType() == st){
-                            OS << "Function " << F.getName() << "use Instuction" << Inst.getOpcodeName() << "use struct " << st->getName() << "via pointer\n";
+                /* 如果是store指令 */
+                if(auto *si = dyn_cast<StoreInst>(&Inst)){
+                    Value *Ptr = si->getPointerOperand();
+                    /* 判断存储的目的指针若与struct相关 */
+                    if(auto *GEP = dyn_cast<GetElementPtrInst>(Ptr)){
+                        if(GEP->getSourceElementType() == st){
+                            Value *ValueToStore = si->getValueOperand();
+                            OS << "\t" << *ValueToStore << " ++++ " << *si->getPointerOperand() << "\n";
                         }
-                    }else if(Op->getType() == st){
-                            OS << "Function " << F.getName() << "use Instuction" << Inst.getOpcodeName() << "use struct " << st->getName() << "\n";
+                    }
+                /* 如果是call指令 */
+                }else if(auto *ci = dyn_cast<CallInst>(&Inst)){
+                    Value *CalledValue = ci->getCalledOperand();
+                    Value *CallerValue = ci->getCaller();
+                    for(int i = 0; i < ci->arg_size(); i++){
+                        Value *Ptr = ci->getArgOperand(i);
+                        /* 如果发现某个参数为alloca struct */
+                        if(auto *ai = dyn_cast<AllocaInst>(Ptr)){
+                            if(ai->getAllocatedType() == st){
+                                OS << "call" << *ai <<"\n";
+                                break;
+                            }
+                        }
                     }
                 }
             }
         }
     }
-
 }
+
 
 
 PreservedAnalyses FindSpecificStruct::run(llvm::Module &M, llvm::ModuleAnalysisManager &MAM){
