@@ -435,6 +435,10 @@ struct proc_dir_entry proc_root = {
 3. 这里注意当我们想要挂载一个文件系统，首先将挂载的dentry标记为已挂载,然后创建新的挂载文件系统的根`dentry`再创建`mount, vfsmount`来指向该根dentry,然后将mount链接全局链表和连接父mount,之后当我们遍历文件系统，看到某个`dentry`为挂载点，则通过hash搜索找到所挂载文件系统的`mount`,然后顺势找到文件系统的根dentry
 4. 最后当打开文件的时候，首先是从根`dentry`开始查找，然后找到目的文件的`dentry`和`inode`,然后填充创建的`struct file`数据结构并且返回
 
+这里记录一下`/proc/<pid>`文件夹的创建是在`fork`系统调用过程当中，核心函数为`proc_pid_instantiate()`
+
+
+
 
 # 引用
 [filesystem](qute://pdfjs/web/viewer.html?filename=tmplgnr5ptt_Linux.Virtual.Filesystem.pdf&file=&source=https://lrita.github.io/images/posts/filesystem/Linux.Virtual.Filesystem.pdf)
