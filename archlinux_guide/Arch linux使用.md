@@ -812,6 +812,15 @@ $ firewall-cmd --zone=zone --change-interface=interface_name
 hyprctl hyprpaper preload "~/Pictures/nice_picture/wallhaven-8oy8yk.jpg"
 hyprctl hyprpaper wallpaper "eDP-1,~/Pictures/nice_picture/wallhaven-8oy8yk.jpg"
 ```
+# 0x18 消息通知
+
+可以使用`notify-send`
+
+```sh
+notify-send <your message>
+long job ; notify-send <job finish message>  # 不管是否执行成功
+command && notify-send <command execute susccess message> # 执行成功才发送
+```
 
 
 
