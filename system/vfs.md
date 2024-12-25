@@ -105,6 +105,8 @@ struct inode {
 ```
 这样一个inode就代表了文件系统当中的一个文件,字段内容则包含了使用者uid等等信息
 
+这里包含两个函数结构指针`i_op`和`i_fop`,一个用来特定于inode操作，另一个则提供了文件操作
+
 然后操作他的相关函数则保存在`inode_operations`当中
 ```c
 struct inode_operations {
@@ -389,7 +391,7 @@ static const struct fs_context_operations proc_fs_context_ops = {
 };
 ```
 3. 中间省略一部分检查，假设我们均通过，调用`vfs_get_tree(fc)`,
-该函数的功能就是获取可以mount的root,在这个函数中首先需要调用`fc->ops->get_tree(c)`,在这里就是`proc_get_tree(fc)`函数,在下面的步骤讲解
+   该函数的功能就是获取可以mount的root,在这个函数中首先需要调用`fc->ops->get_tree(c)`,在这里就是`proc_get_tree(fc)`函数,在下面的步骤讲解
     1. 这个函数是`get_tree_nodev(fc, proc_fill_super)`的wrapper
     2. 上面的函数又是`vfs_get_super(fc, vfs_get_independent_super, fill_super)`的wrapper
     3. 调用`sget_fc()`函数来创建一个新的匿名`super_block`, 这里创建完sb后会将其链接到内核全局变量`super_blocks`当中
