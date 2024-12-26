@@ -461,7 +461,7 @@ info inferior 						//显示多进程信息
 inferior ** 					//切换调试进程
 ```
 
-如果想要在`virt-manager`中调试，那么就需要修改virt的xml文件，修改格式如下
+如果想要在`virt-manager`中调试，那么就需要修改virt的xml文件,解决方法来源于该[blog](https://mhcerri.github.io/posts/debugging-the-ubuntu-kernel-with-gdb-and-qemu/)，修改格式如下
 ```sh
 virsh list --all
 virsh edit "<域名称>"
