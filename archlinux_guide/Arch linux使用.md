@@ -461,6 +461,26 @@ info inferior 						//显示多进程信息
 inferior ** 					//切换调试进程
 ```
 
+如果想要在`virt-manager`中调试，那么就需要修改virt的xml文件，修改格式如下
+```sh
+virsh list --all
+virsh edit "<域名称>"
+```
+然后进行以下修改
+```xml
+<domain type ='kvm'>
+...
+
+# 修改为
+
+<domain type ='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
+    <qemu:commandline>
+        <qemu:arg value='-s'/>
+    </qemu:commandline>
+...
+
+```
+之后就可以正常使用gdb进行调试
 
 
 
