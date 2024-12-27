@@ -24,7 +24,7 @@ INCLUDES := -I$(OUTPUT) -I../../libbpf/include/uapi -I$(dir $(VMLINUX)) -I$(LIBB
 CFLAGS := -g -Wall
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)
 
-APPS = forkfilter minimal_legacy
+APPS = minimal_legacy
 
 CARGO ?= $(shell which cargo)
 ifeq ($(strip $(CARGO)),)

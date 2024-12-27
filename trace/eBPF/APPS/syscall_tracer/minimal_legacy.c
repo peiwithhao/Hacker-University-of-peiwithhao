@@ -1,7 +1,11 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
+
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <bpf/libbpf.h>
 #include <linux/perf_event.h>
 #include "minimal_legacy.skel.h"
@@ -12,12 +16,21 @@ static FILE *of = NULL;
 
 static int handle_event(void *ctx, void *data, size_t data_sz) {
     const struct syscall_event *event = data;
-    fprintf(of, "%-20s\t[",syscalls[event->syscall_id].name);
-    for(int i = 0; i < syscalls[event->syscall_id].num_args; i++){
-      if (i < syscalls[event->syscall_id].num_args - 1) {
-            fprintf(of, "%-20.20lu, ", event->args[i]);
+    struct default_syscall_info *sys_table;
+   
+    /* 是否是32位兼容程序 */
+    if(event->is_compat){
+	    sys_table = compat_syscalls;
+    }else{
+	    sys_table = syscalls;
+    }
+    
+    fprintf(of, "%-10s\t[",sys_table[event->syscall_id].name);
+    for(int i = 0; i < sys_table[event->syscall_id].num_args; i++){
+      if (i < sys_table[event->syscall_id].num_args - 1) {
+            fprintf(of, "0x%lx, ", event->args[i]);
         } else {
-            fprintf(of, "%-20.20lu", event->args[i]);
+            fprintf(of, "0x%lx", event->args[i]);
         }
     }
     fprintf(of, "]\n");
@@ -47,6 +60,7 @@ int main(int argc, char **argv)
 	    		case 'p':
 			// 将传递的参数转换为整数
 				pid = (pid_t)atoi(optarg);
+				printf("pid: %d\n", pid);
 				pid_set = 0;
 				break;
 			case 'o':
@@ -64,6 +78,10 @@ int main(int argc, char **argv)
 	if(!of){
 		of = stdout;
 	}
+	/* send the ns dev,ino to ebpf program */
+	char pid_ns_path[0x50];
+	snprintf(pid_ns_path, sizeof(pid_ns_path), "/proc/%d/ns/pid", pid);
+	struct stat st;
 	/* Set up libbpf errors and debug info callback */
 	libbpf_set_print(libbpf_print_fn);
 
@@ -73,6 +91,12 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Failed to open and load BPF skeleton\n");
 		return 1;
 	}
+	if(stat(pid_ns_path, &st) == -1){
+		fprintf(stderr, "Failed to check the pid ns\n");
+		return 1;
+	}
+	skel->bss->dev = st.st_dev;
+	skel->bss->ino = st.st_ino;
 
 	/* ensure BPF program only handles write() syscalls from our process */
 // pid = getpid();
@@ -104,7 +128,7 @@ int main(int argc, char **argv)
 	// 主循环：等待事件并处理
     	printf("系统调用:\t[参数1, \t 参数2, \t 参数3, \t 参数4, \t 参数5, \t 参数6\n");
 	while (1) {
-	    int err = ring_buffer__poll(rb, 100 /* ms */);
+	    int err = ring_buffer__poll(rb, 50 /* ms */);
 	    if (err < 0) {
 		fprintf(stderr, "Error polling perf buffer: %d\\n", err);
 		break;

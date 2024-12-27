@@ -1,14 +1,9 @@
 #ifndef __MINIMAL_LEGACY_H
 #define __MINIMAL_LEGACY_H
-#define MAX_SYSCALL_NR 451
-
-struct default_syscall_info {
-	const char *name;
-	int num_args;
-};
 
 struct syscall_event {
     long int syscall_id;
+    unsigned int is_compat;
     long unsigned int args[6];
 };
 
