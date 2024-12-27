@@ -840,5 +840,15 @@ notify-send <your message>
 long job ; notify-send <job finish message>  # 不管是否执行成功
 command && notify-send <command execute susccess message> # 执行成功才发送
 ```
+# 0x19 docker使用
+若要查看主机中容器的进程映射pid
+```sh
+sudo docker top <container_id>
+```
+
+若要查看容器信息
+```sh
+sudo docker inspect --format {{.State.Pid}} <container_id>    
+```
 
 

@@ -108,6 +108,10 @@
 
 
 
+# 相关Paper
++ [Constructing arbitrary write via puppet objects and delivering gadgets in Linux kernel](https://www.sciencedirect.com/science/article/abs/pii/S0167404824004942#preview-section-snippets)
++ 
+
 
 # 调试slab
 可使用`slabtop`命令
