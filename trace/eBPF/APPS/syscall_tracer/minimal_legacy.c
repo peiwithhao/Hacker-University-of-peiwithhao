@@ -14,6 +14,7 @@
 
 static FILE *of = NULL;
 
+
 static int handle_event(void *ctx, void *data, size_t data_sz) {
     const struct syscall_event *event = data;
     struct default_syscall_info *sys_table;
