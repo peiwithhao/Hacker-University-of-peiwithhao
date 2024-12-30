@@ -121,6 +121,7 @@
 + `CONFIG_STATIC_USERMODEHELPER`:默认情况下内核可以通过`Usermode helper`来调用许多不同的用户空间二进制程序，设置此项目即为禁用所有USERMODE HELPER程序,同时需要将`STATIC_USERMODEHELPER_PATH`设置为空字符串
 + `CONFIG_SLAB_VIRTUAL`:Google所提出的使用内核虚拟地址来分配slab，且需要确保分配的该slab不会复用其他的slab
 + `CONFIG_INIT_ON_FREE_DEFAULT_ON`:效果等同于`init_on_free = 1`,可以使用`init_on_free =0 `来禁用，释放page后将会清空其内容,但可能造成较高负载
++ `CONFIG_PACKET`:数据包协议由应用程序使用，这些应用程序直接与网络设备通信，而没有内核中实现的中间网络协议，例如tcpdump。如果您希望他们工作，请选择Y。
 
 
 
