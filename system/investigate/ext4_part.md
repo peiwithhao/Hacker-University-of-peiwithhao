@@ -244,7 +244,7 @@ static ssize_t ext4_dio_write_iter(struct kiocb *iocb, struct iov_iter *from)
 文件系统能够在发生故障时进行有效的恢复，维护数据的完整性和一致性。
 5. 在上面的内容过后，会调用`iomap_dio_rw`进行写入,这个函数是`__io_map_dio_rw`的wrapper,下面单独解释该函数
 
-## `__io_map_dio_rw`
+## __io_map_dio_rw
 该函数首先是为直接IO分配内存
 ```c
 struct iomap_dio *
@@ -313,9 +313,43 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 	}
 ```
 
+这里首先调用了`inode_dio_begin()`函数
 
+### iomap_iter()
+传递的参数为`iomap_iter`还有`iomap_ops`
+这里主要的功能是处理逻辑块和物理块之间的映射，并将其保存在`iomap`结构体当中
 
+```c
+int iomap_iter(struct iomap_iter *iter, const struct iomap_ops *ops)
+{
+	int ret;
 
+	if (iter->iomap.length && ops->iomap_end) {
+		ret = ops->iomap_end(iter->inode, iter->pos, iomap_length(iter),
+				iter->processed > 0 ? iter->processed : 0,
+				iter->flags, &iter->iomap);
+		if (ret < 0 && !iter->processed)
+			return ret;
+	}
+
+	trace_iomap_iter(iter, ops, _RET_IP_);
+	ret = iomap_iter_advance(iter);
+	if (ret <= 0)
+		return ret;
+
+	ret = ops->iomap_begin(iter->inode, iter->pos, iter->len, iter->flags,
+			       &iter->iomap, &iter->srcmap);
+	if (ret < 0)
+		return ret;
+	iomap_iter_done(iter);
+	return 1;
+}
+```
+这里的`ops->iomap_begin`为之前传入的全局变量，为`ext4_iomap_begin`函数，end类似
+在`ext4_iomap_begin()`函数的过程中，就会给`iomap_iter->iomap`赋值，这里的内容就是逻辑块和物理块的映射
+
+### iomap_dio_iter
+该函数进行了真正的io处理
 
 
 
