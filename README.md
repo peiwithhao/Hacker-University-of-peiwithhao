@@ -27,4 +27,4 @@ As we embark on this exploration of hacking techniques, we aim to cultivate a co
 |[ctf](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/ctf)|..|..|..|
 |[netlink](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/netlink)|..|..|..|
 |..|..|container|..|
-|..|rootkit|..|..|
+|[rootkit](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/rootkit)|..|..|..|
