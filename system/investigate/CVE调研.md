@@ -3,7 +3,7 @@
 CVE-2022-23222: 
 + 原因：eBPF verify漏洞，没有对`*_OR_NULL`指针类型进行限制，
 导致攻击者可以利用漏洞在获取低权限的情况下构造而已数据执行空指针引用攻击
-+ 结果: 权限提升
++ 结果: 权限提升,逃逸
 + 利用exp: ebpf程序编写，[https://github.com/tr3ee/CVE-2022-23222](https://github.com/tr3ee/CVE-2022-23222)
 
 CVE-2022-0995:
@@ -13,12 +13,12 @@ CVE-2022-0995:
 
 CVE-2021-4204:
 + 原因: eBPF verify 漏洞， 检测输入不当导致越界溢出
-+ 结果: 权限提升
++ 结果: 权限提升,逃逸
 + 利用exp: 
 
 CVE-2017-16995:
 + 原因: eBPF verify漏洞，`check_alu_op`函数检查出错
-+ 结果: 提权
++ 结果: 提权,逃逸
 + 利用exp: [https://www.exploit-db.com/exploits/45010](https://www.exploit-db.com/exploits/45010) 
 
 CVE-2017-5123:
@@ -102,8 +102,8 @@ CVE-2022-27666:
 + 利用exp: 页级堆风水,[https://etenal.me/archives/1825](https://etenal.me/archives/1825)
 
 CVE-2016-8655:
-+ 原因:packet_set_ring函数在创建ringbuffer的时候，如果packet版本为TPACKET_V3，则会初始化struct timer_list，如下图所示。packet_set_ring函数返回之前，其他线程可调用setsockopt函数将packet版本设定为TPACKET_V1。前面初始化的timer未在内核队列中被注销，timer过期时触发struct timer_list中回调函数的执行，形成UAF漏洞。 
-+ 结果: 提权
++ 原因:packet_set_ring函数在创建ringbuffer的时候，如果packet版本为TPACKET_V3，则会初始化struct timer_list，packet_set_ring函数返回之前，其他线程可调用setsockopt函数将packet版本设定为TPACKET_V1。前面初始化的timer未在内核队列中被注销，timer过期时触发struct timer_list中回调函数的执行，形成UAF漏洞。 
++ 结果: 提权,逃逸
 + 利用exp: [https://www.anquanke.com/post/id/85162](https://www.anquanke.com/post/id/85162)
 
 CVE-2022-0847:
@@ -115,8 +115,6 @@ CVE-2021-3493:
 + 原因: vfs_setxattr() 函数并没有调用 cap_convert_nscap() 函数来进行校验，没有检查程序与环境的 namespace 是否一致
 + 结果: 提权
 + 利用exp: [https://bbs.kanxue.com/thread-274241.htm](https://bbs.kanxue.com/thread-274241.htm),[https://github.com/briskets/CVE-2021-3493/tree/main](https://github.com/briskets/CVE-2021-3493/tree/main)
-
-
 CVE-2016-4557:
 + 原因: 在4.5.5之前，Linux内核中的内核/bpf/verifier.c中的repleast_map_fd_with_map_ptr函数无法正确维护FD数据结构，该结构允许本地用户获得特权或通过精制的服务(uaf)， BPF指令引用不正确的文件描述符。
 + 结果: 提权,逃逸
@@ -127,3 +125,19 @@ CVE-2018-18955:
 + 结果: 提权
 + 利用exp: 逻辑漏洞利用[https://www.freebuf.com/vuls/197122.html](https://www.freebuf.com/vuls/197122.html)
 
+
+| |提权|逃逸|提权&逃逸|
+|--|--|--|--|
+|堆溢出|CVE-2020-14386,CVE-2022-27666 | |CVE-2022-0995, CVE-2022-25636, CVE-2017-1000112, CVE-2021-22555|
+|整型溢出| | |CVE-2016-0728,CVE-2022-0185, CVE-2017-7308|
+|UAF| | |CVE-2017-11176, CVE-2016-0728, CVE-2016-8655|
+|Double free| | |CVE-2017-6074|
+|Verifier|CVE-2022-23222| |CVE-2022-23222,CVE-2021-4204,CVE-2017-16995, CVE-2017-5123,CVE-2016-9793, CVE-2021-3493|
+|条件竞争|CVE-2016-5195| | |
+|其他|CVE-2022-0847,CVE-2018-18955 | |CVE-2016-4997|
+
+
+
+
+
+G
