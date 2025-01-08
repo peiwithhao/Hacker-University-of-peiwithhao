@@ -4,10 +4,8 @@
 #include <sys/ioctl.h>
 #include <stdlib.h>
 
-#define MODIFY_CRED 0x1111
-#define ESCALATE    0x2222
-#define GIVER       0x3333
-
+#define USER_KALLSYMS 0x1111
+#define SEARCH_SYSCALL 0x2222
 struct user_args{
     void * content;
     int size;
@@ -22,7 +20,7 @@ int main(int argc, char ** argv){
         perror("open");
         return -1;
     }
-    if(ioctl(fd, GIVER, pid)){
+    if(ioctl(fd, SEARCH_SYSCALL, pid)){
         perror("ioctl");
         return -1;
     }

