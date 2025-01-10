@@ -850,5 +850,13 @@ sudo docker top <container_id>
 ```sh
 sudo docker inspect --format {{.State.Pid}} <container_id>    
 ```
+# 0x1A cpu相关
+查看CPU主频:
+```sh
+lscpu | grep -i "MHz"
+# 下面更帅
+neofetch
+fastfetch
+```
 
 
