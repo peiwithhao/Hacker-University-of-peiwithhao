@@ -317,6 +317,8 @@ static size_t arbitrary_pte_write(void *dst, void *src, size_t size){
 然后我们利用之前的任意写函数来改写该系统调用表的任意地址就可以达成hook
 
 
+### inline hook
+什么是inline hook, 实际上就是修改目标hook点的汇编代码，变成一串jmp <target addr>, 然后hook程序完毕后再恢复上下文的过程
 
 
 
