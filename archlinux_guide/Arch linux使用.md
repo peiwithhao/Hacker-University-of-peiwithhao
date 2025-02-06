@@ -197,6 +197,15 @@ lsof -i :端口号 			//显示使用端口的进程
 
 ```
 
+NetworkManager默认会以明文的形式将密码存放在`/etc/NetworkManager/system-connections/`
+
+可通过下面的命令来查看密码
+`grep -r '^psk=' /etc/NetworkManager/system-connections/`
+
+
+
+
+
 # 0x04.日志管理
 
 ```
