@@ -835,6 +835,20 @@ $ firewall-cmd --zone=zone --change-interface=interface_name
 ```
 其中zone是你想切换到的区域，而`interface_name`则是你想要修改的网卡接口
 
+添加服务到区域
+```sh
+firewall-cmd --zone=zone_name --add-service service_name
+firewall-cmd --zone=zone_name --remove-service service_name
+```
+
+开放端口
+```sh
+firewall-cmd --zone=zone_name --add-port port_num/protocol
+firewall-cmd --zone=zone_name --remove-port port_num/protocol
+```
+
+这里protocol应该为tcp或udp之一
+
 # 0x17 hyprpaper
 可以先通过`hyprctl`来修改壁纸
 ```sh
