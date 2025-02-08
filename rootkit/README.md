@@ -358,6 +358,92 @@ static size_t arbitrary_pte_write(void *dst, void *src, size_t size){
 这里个人实现的仅仅为一次的hook，至于持久化的hook感觉可以参考a3师傅的动态hook技术，但这一点始终没有想好该如何结合自己所得出的hook技巧
 
 
+---
+
+经过春节的~~玩耍~~沉淀，这里给出对于一次性塑料hook的修改版本，在参考a3师傅的动态hook技术的基础上，我发现其中并不能实现任意地址的hook，
+其类似于kprobe和kret,仅仅在函数调用和调用完毕时进行hook,因此我个人感觉还是不太自由
+所以添加了对整个环境寄存器的保存，这样能够达成最大的自由度
+
+核心代码如下，具体可以看git仓库里面的整体函数
+
+```c
+
+...
+static size_t hook_king(void){
+    asm volatile(
+        "subq $0x100, %%rsp;"
+        "movq %%rax, %0;"
+        "movq %%rbx, %1;"
+        "movq %%rcx, %2;"
+        "movq %%rdx, %3;"
+        "movq %%rsi, %4;"
+        "movq %%rdi, %5;"
+        "movq %%rbp, %6;"
+        "movq %%r8, %7;"
+        "movq %%r9, %8;"
+        "movq %%r10, %9;"
+        "movq %%r11, %10;"
+        "movq %%r12, %11;"
+        "movq %%r13, %12;"
+        "movq %%r14, %13;"
+        "movq %%r15, %14;"
+        "addq $0x100, %%rsp;"
+
+        : "=m"(temp_hook_ctx.regs.ax),  "=m"(temp_hook_ctx.regs.bx), \
+          "=m"(temp_hook_ctx.regs.cx),  "=m"(temp_hook_ctx.regs.dx), \
+          "=m"(temp_hook_ctx.regs.si),  "=m"(temp_hook_ctx.regs.di), \
+          "=m"(temp_hook_ctx.regs.bp),  "=m"(temp_hook_ctx.regs.r8), \
+          "=m"(temp_hook_ctx.regs.r9),  "=m"(temp_hook_ctx.regs.r10), \
+          "=m"(temp_hook_ctx.regs.r11), "=m"(temp_hook_ctx.regs.r12), \
+          "=m"(temp_hook_ctx.regs.r13), "=m"(temp_hook_ctx.regs.r14), \
+          "=m"(temp_hook_ctx.regs.r15)
+        :
+        : );
+    temp_hook_ctx.hook_before(&(temp_hook_ctx.regs));
+    /* 恢复内容 */
+    arbitrary_remap_write((void *)temp_hook_ctx.orig_func, temp_hook_ctx.orig_code, temp_hook_ctx.shellcode_nr);
+
+    asm volatile(
+        "movq %1, %%rax;"
+        "movq %2, %%rbx;"
+        "movq %3, %%rcx;"
+        "movq %4, %%rdx;"
+        "movq %5, %%rsi;"
+        "movq %6, %%rdi;"
+        "movq %7, %%rbp;"
+        "movq %8, %%r8;"
+        "movq %9, %%r9;"
+        "movq %10, %%r10;"
+        "movq %11, %%r11;"
+        "movq %12, %%r12;"
+        "movq %13, %%r13;"
+        "movq %14, %%r14;"
+        "movq %15, %%r15;"
+        "call *%16;"
+        "movq %%rax, %0"
+        : "=m"(temp_hook_ctx.ret)
+        : "m"(temp_hook_ctx.regs.ax),  "m"(temp_hook_ctx.regs.bx), \
+          "m"(temp_hook_ctx.regs.cx),  "m"(temp_hook_ctx.regs.dx), \
+          "m"(temp_hook_ctx.regs.si),  "m"(temp_hook_ctx.regs.di), \
+          "m"(temp_hook_ctx.regs.bp),  "m"(temp_hook_ctx.regs.r8), \
+          "m"(temp_hook_ctx.regs.r9),  "m"(temp_hook_ctx.regs.r10), \
+          "m"(temp_hook_ctx.regs.r11), "m"(temp_hook_ctx.regs.r12), \
+          "m"(temp_hook_ctx.regs.r13), "m"(temp_hook_ctx.regs.r14), \
+          "m"(temp_hook_ctx.regs.r15), "m"(temp_hook_ctx.orig_func)
+        : 
+    );
+    //temp_hook_ctx.orig_func(temp_hook_ctx.regs.di, temp_hook_ctx.regs.si, temp_hook_ctx.regs.dx, temp_hook_ctx.regs.cx, temp_hook_ctx.regs.r8, temp_hook_ctx.regs.r9);
+    /* 重新hook */
+    arbitrary_remap_write((void *)temp_hook_ctx.orig_func, temp_hook_ctx.hook_code, temp_hook_ctx.shellcode_nr);
+    return temp_hook_ctx.ret;
+}
+...
+```
+
+
+
+
+
 
 
 
