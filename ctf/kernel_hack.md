@@ -108,6 +108,53 @@
 
 
 
+# vDSO 的利用
+他的发明主要是为了解决内核给用户提供的系统调用API由于涉及到上写文的切换导致太过缓慢的问题，
+他将部分频繁调用且简单的API直接暴露给用户使用,而他暴露的方法就是采用了动态链接库的思想
+将这部分会频繁使用的系统调用作为vDSO(virtual Dynamic shared object)链接到用户程序，我们可以使用ldd来查看
+
+```sh
+❯ ldd pwn
+	linux-vdso.so.1 (0x0000749f0eeaa000)
+	libgcc_s.so.1 => /usr/lib/libgcc_s.so.1 (0x0000749f0edd7000)
+	libc.so.6 => /usr/lib/libc.so.6 (0x0000749f0ebe5000)
+	/lib64/ld-linux-x86-64.so.2 => /usr/lib64/ld-linux-x86-64.so.2 (0x0000749f0eeac000)
+```
+我们也可以通过proc文件系统来查看当前进程的动态库详情
+
+```sh
+❯ cat /proc/self/maps
+5888c2233000-5888c2235000 r--p 00000000 103:09 2636176                   /usr/bin/cat
+5888c2235000-5888c223a000 r-xp 00002000 103:09 2636176                   /usr/bin/cat
+5888c223a000-5888c223c000 r--p 00007000 103:09 2636176                   /usr/bin/cat
+5888c223c000-5888c223d000 r--p 00008000 103:09 2636176                   /usr/bin/cat
+5888c223d000-5888c223e000 rw-p 00009000 103:09 2636176                   /usr/bin/cat
+5888f73f5000-5888f7416000 rw-p 00000000 00:00 0                          [heap]
+7ae4cf800000-7ae4cfdf3000 r--p 00000000 103:09 2677262                   /usr/lib/locale/locale-archive
+7ae4cff8c000-7ae4cffd1000 rw-p 00000000 00:00 0 
+7ae4cffd1000-7ae4cfff5000 r--p 00000000 103:09 2624878                   /usr/lib/libc.so.6
+7ae4cfff5000-7ae4d0166000 r-xp 00024000 103:09 2624878                   /usr/lib/libc.so.6
+7ae4d0166000-7ae4d01b5000 r--p 00195000 103:09 2624878                   /usr/lib/libc.so.6
+7ae4d01b5000-7ae4d01b9000 r--p 001e3000 103:09 2624878                   /usr/lib/libc.so.6
+7ae4d01b9000-7ae4d01bb000 rw-p 001e7000 103:09 2624878                   /usr/lib/libc.so.6
+7ae4d01bb000-7ae4d01c5000 rw-p 00000000 00:00 0 
+7ae4d0200000-7ae4d0202000 r--p 00000000 00:00 0                          [vvar]
+7ae4d0202000-7ae4d0204000 r--p 00000000 00:00 0                          [vvar_vclock]
+7ae4d0204000-7ae4d0206000 r-xp 00000000 00:00 0                          [vdso]
+7ae4d0206000-7ae4d0207000 r--p 00000000 103:09 2624828                   /usr/lib/ld-linux-x86-64.so.2
+7ae4d0207000-7ae4d0230000 r-xp 00001000 103:09 2624828                   /usr/lib/ld-linux-x86-64.so.2
+7ae4d0230000-7ae4d023b000 r--p 0002a000 103:09 2624828                   /usr/lib/ld-linux-x86-64.so.2
+7ae4d023b000-7ae4d023d000 r--p 00035000 103:09 2624828                   /usr/lib/ld-linux-x86-64.so.2
+7ae4d023d000-7ae4d023e000 rw-p 00037000 103:09 2624828                   /usr/lib/ld-linux-x86-64.so.2
+7ae4d023e000-7ae4d023f000 rw-p 00000000 00:00 0 
+7fffd682d000-7fffd684e000 rw-p 00000000 00:00 0                          [stack]
+ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0                  [vsyscall]
+```
+
+而vDSO是由内核给用户提供的一个内存文件，所以按理来讲只要我们将内存中的vDSO修改，
+那么就能够影响到主机上所有的进程执行非预期的行为
+
+
 # 相关Paper
 + [Constructing arbitrary write via puppet objects and delivering gadgets in Linux kernel](https://www.sciencedirect.com/science/article/abs/pii/S0167404824004942#preview-section-snippets)
 + 
