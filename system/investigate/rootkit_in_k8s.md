@@ -147,6 +147,10 @@ EOF
 [https://blog.nsfocus.net/k0otkithack-k8s-in-a-k8s-way/](https://blog.nsfocus.net/k0otkithack-k8s-in-a-k8s-way/)
 [内核信息取证](https://www.youtube.com/watch?v=6oe7qL7-WoI)
 [使用rootkit隐藏蜜罐](https://www.sciencedirect.com/science/article/abs/pii/S1084804523000255)
+[eBPF版本的rootkit实现](https://www.youtube.com/watch?v=g6SKWT7sROQ)
+[eBPF enemy](https://www.youtube.com/watch?v=Q8eY67hDvkc)
+
+
 
 
 
