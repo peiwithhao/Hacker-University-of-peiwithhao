@@ -128,7 +128,9 @@ static size_t do_hook(void){
           "=m"(temp_hook_ctx.regs.r15)
         :
         : );
-    temp_hook_ctx.hook_before(&(temp_hook_ctx.regs));
+    if(temp_hook_ctx.hook_before){
+        temp_hook_ctx.hook_before(&(temp_hook_ctx.regs));
+    }
     /* 恢复内容 */
     arbitrary_remap_write((void *)temp_hook_ctx.orig_func, temp_hook_ctx.orig_code, temp_hook_ctx.shellcode_nr);
 
@@ -163,7 +165,9 @@ static size_t do_hook(void){
           "m"(temp_hook_ctx.regs.r15), "m"(temp_hook_ctx.orig_func)
         : 
     );
-    temp_hook_ctx.hook_after(&(temp_hook_ctx.regs));
+    if(temp_hook_ctx.hook_after){
+        temp_hook_ctx.hook_after(&(temp_hook_ctx.regs));
+    }
 
     /* 重新hook */
     arbitrary_remap_write((void *)temp_hook_ctx.orig_func, temp_hook_ctx.hook_code, temp_hook_ctx.shellcode_nr);
