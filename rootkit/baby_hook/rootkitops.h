@@ -9,8 +9,6 @@
 
 
 
-
-
 ssize_t pwh_rootkit_read(struct file *, char __user *, size_t, loff_t *);
 ssize_t pwh_rootkit_write(struct file *, const char __user *, size_t, loff_t *);
 long pwh_rootkit_ioctl(struct file *, unsigned int, unsigned long);
