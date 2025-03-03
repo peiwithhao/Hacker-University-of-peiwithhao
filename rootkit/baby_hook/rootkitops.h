@@ -6,6 +6,7 @@
 #define USER_KALLSYMS 0x1111
 #define SEARCH_SYSCALL 0x2222
 #define SUPER_HOOK 0x3333
+#define HOOK_RELEASE 0x4444
 
 
 

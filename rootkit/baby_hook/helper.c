@@ -140,82 +140,7 @@ void sys_call_table_finder(void){
     get_syscall_data = 1;
 }
 
- size_t do_hook(void){
-     asm volatile(
-         "subq $0x100, %%rsp;"
-         "movq %%rax, %0;"
-         "movq %%rbx, %1;"
-         "movq %%rcx, %2;"
-         "movq %%rdx, %3;"
-         "movq %%rsi, %4;"
-         "movq %%rdi, %5;"
-         "movq %%rbp, %6;"
-         "movq %%r8, %7;"
-         "movq %%r9, %8;"
-         "movq %%r10, %9;"
-         "movq %%r11, %10;"
-         "movq %%r12, %11;"
-         "movq %%r13, %12;"
-         "movq %%r14, %13;"
-         "movq %%r15, %14;"
-         "addq $0x100, %%rsp;"
-
-         : "=m"(temp_hook_ctx.regs.ax),  "=m"(temp_hook_ctx.regs.bx), 
-           "=m"(temp_hook_ctx.regs.cx),  "=m"(temp_hook_ctx.regs.dx), 
-           "=m"(temp_hook_ctx.regs.si),  "=m"(temp_hook_ctx.regs.di), 
-           "=m"(temp_hook_ctx.regs.bp),  "=m"(temp_hook_ctx.regs.r8), 
-           "=m"(temp_hook_ctx.regs.r9),  "=m"(temp_hook_ctx.regs.r10),
-           "=m"(temp_hook_ctx.regs.r11), "=m"(temp_hook_ctx.regs.r12),
-           "=m"(temp_hook_ctx.regs.r13), "=m"(temp_hook_ctx.regs.r14),
-           "=m"(temp_hook_ctx.regs.r15)
-         :
-         : );
-     if(temp_hook_ctx.hook_before){
-         temp_hook_ctx.hook_before(&(temp_hook_ctx.regs));
-     }
-     
-     arbitrary_remap_write((void *)temp_hook_ctx.orig_func, temp_hook_ctx.orig_code, temp_hook_ctx.shellcode_nr);
-
-
-     
-     asm volatile(
-         "movq %1, %%rax;"
-         "movq %2, %%rbx;"
-         "movq %3, %%rcx;"
-         "movq %4, %%rdx;"
-         "movq %5, %%rsi;"
-         "movq %6, %%rdi;"
-         "movq %7, %%rbp;"
-         "movq %8, %%r8;"
-         "movq %9, %%r9;"
-         "movq %10, %%r10;"
-         "movq %11, %%r11;"
-         "movq %12, %%r12;"
-         "movq %13, %%r13;"
-         "movq %14, %%r14;"
-         "movq %15, %%r15;"
-         "call *%16;"
-         "movq %%rax, %0"
-         : "=m"(temp_hook_ctx.ret)
-         : "m"(temp_hook_ctx.regs.ax),  "m"(temp_hook_ctx.regs.bx), 
-           "m"(temp_hook_ctx.regs.cx),  "m"(temp_hook_ctx.regs.dx), 
-           "m"(temp_hook_ctx.regs.si),  "m"(temp_hook_ctx.regs.di), 
-           "m"(temp_hook_ctx.regs.bp),  "m"(temp_hook_ctx.regs.r8), 
-           "m"(temp_hook_ctx.regs.r9),  "m"(temp_hook_ctx.regs.r10),
-           "m"(temp_hook_ctx.regs.r11), "m"(temp_hook_ctx.regs.r12),
-           "m"(temp_hook_ctx.regs.r13), "m"(temp_hook_ctx.regs.r14),
-           "m"(temp_hook_ctx.regs.r15), "m"(temp_hook_ctx.orig_func)
-         : 
-     );
-     if(temp_hook_ctx.hook_after){
-         temp_hook_ctx.hook_after(&(temp_hook_ctx.regs));
-     }
-
-     
-     arbitrary_remap_write((void *)temp_hook_ctx.orig_func, temp_hook_ctx.hook_code, temp_hook_ctx.shellcode_nr);
-     return temp_hook_ctx.ret;
- }
- size_t do_hook_pro(struct hook_context *hook_ctx){
+ size_t do_hook(struct hook_context *hook_ctx){
      asm volatile(
          "movq %%rax, %0;"
          "movq %%rbx, %1;"
@@ -288,16 +213,11 @@ void sys_call_table_finder(void){
 
 
 
-#define SHELLCODE_MAX_NR 1024
-static size_t orig_code[SHELLCODE_MAX_NR] = {0};
-static u8 shell_code[SHELLCODE_MAX_NR] = {0};
 
 /* 向函数添加hook */
-ssize_t orig_modifier(struct hook_context *hook_ctx, size_t orig_func, size_t hook_before, size_t hook_after){
+ssize_t hookpoint_add(struct hook_context *hook_ctx, size_t orig_func, size_t hook_before, size_t hook_after){
     size_t shellcode_nr;
     size_t index;
-    size_t *share_orig;
-    size_t *share_shell;
     size_t hook_ctl;
     size_t hook_ctx_ptr;
     /* 保存hook函数 */
@@ -305,7 +225,7 @@ ssize_t orig_modifier(struct hook_context *hook_ctx, size_t orig_func, size_t ho
     hook_ctx->hook_after = (void (*)(struct pt_regs *))hook_after;
     hook_ctx->orig_func = (void (*)(size_t, size_t, size_t, size_t, size_t, size_t))orig_func;
 
-    hook_ctl = (size_t)do_hook_pro;
+    hook_ctl = (size_t)do_hook;
     hook_ctx_ptr = (size_t)hook_ctx;
 
     // mov r15 rdi
@@ -317,35 +237,38 @@ ssize_t orig_modifier(struct hook_context *hook_ctx, size_t orig_func, size_t ho
 
     /* 保存指令 */
     memcpy((size_t *)(hook_ctx->orig_code), (size_t *)orig_func, shellcode_nr);
-    share_orig = orig_code;
-    share_shell = (size_t *)shell_code;
 
     
     index = 0;
 
     hook_ctl = hook_ctl  - orig_func - shellcode_nr + 4;
     /* mov r15, rdi */
-    shell_code[index++] = 0x49;
-    shell_code[index++] = 0x89;
-    shell_code[index++] = 0xff;
-    /* mov rdi, hook_ctx */
-    shell_code[index++] = 0x48;
-    shell_code[index++] = 0xBF;
+    ((char *)(hook_ctx->hook_code))[index++] = 0x49;
+    ((char *)(hook_ctx->hook_code))[index++] = 0x89;
+    ((char *)(hook_ctx->hook_code))[index++] = 0xff;
+    // /* mov rdi, hook_ctx */
+    ((char *)(hook_ctx->hook_code))[index++] = 0x48;
+    ((char *)(hook_ctx->hook_code))[index++] = 0xBF;
     for(int i = 0; i < sizeof(size_t) ; i++){
-        shell_code[index++] = ((char *)&hook_ctx_ptr)[i];
+        ((char *)hook_ctx->hook_code)[index++] = ((char *)&hook_ctx_ptr)[i];
+
     }
     /* jmp [rip + ] */
-    shell_code[index++] = 0xE9;
+    //shell_code[index++] = 0xE9;
+    ((char *)hook_ctx->hook_code)[index++] = 0xE9;
     for(int i = 0; i < sizeof(size_t) ; i++){
-        shell_code[index++] = ((char *)&hook_ctl)[i];
+        ((char *)hook_ctx->hook_code)[index++] = ((char *)&hook_ctl)[i];
     }
     /* 保存shellcode */
-    memcpy((size_t *)(hook_ctx->hook_code), (size_t *)shell_code, shellcode_nr);
     hook_ctx->shellcode_nr = shellcode_nr;
 
-    arbitrary_remap_write((void *)orig_func, shell_code, shellcode_nr);
+    arbitrary_remap_write((void *)orig_func, hook_ctx->hook_code, shellcode_nr);
 
     return 0;
 }
 
 
+ssize_t hookpoint_del(struct hook_context *hook_ctx){
+    arbitrary_remap_write((void *)hook_ctx->orig_func, hook_ctx->orig_code, hook_ctx->shellcode_nr);
+    return 0;
+}

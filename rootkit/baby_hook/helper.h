@@ -21,8 +21,6 @@ struct hook_context{
 extern size_t syscall_table_data[5];
 extern size_t get_syscall_data;
 extern size_t syscall_table_addr;
-/* 用来存放hook上下文 */
-extern struct hook_context temp_hook_ctx;
 
 
 
@@ -32,9 +30,10 @@ extern struct hook_context temp_hook_ctx;
 size_t arbitrary_pte_write(void *dst, void *src, size_t size);
 void arbitrary_cr0_write(void *dst, void *src, size_t count);
 int arbitrary_remap_write(void *dst, void *src, size_t size);
-size_t do_hook(void);
+size_t do_hook(struct hook_context *);
 void sys_call_table_finder(void);
-ssize_t orig_modifier(struct hook_context * hook_ctx, size_t orig_func, size_t hook_before, size_t hook_after);
+ssize_t hookpoint_add(struct hook_context * hook_ctx, size_t orig_func, size_t hook_before, size_t hook_after);
+ssize_t hookpoint_del(struct hook_context *hook_ctx);
 
 
 #endif
