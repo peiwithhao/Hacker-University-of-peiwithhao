@@ -265,9 +265,6 @@ PKG_CONFIG_ARGN:STRING=
 //pkg-config executable
 PKG_CONFIG_EXECUTABLE:FILEPATH=/usr/bin/pkg-config
 
-//Path to a library.
-Terminfo_LIBRARIES:FILEPATH=/usr/lib/libtinfo.so
-
 //Path to a file.
 ZLIB_INCLUDE_DIR:PATH=/usr/include
 
@@ -314,7 +311,7 @@ CMAKE_CACHE_MAJOR_VERSION:INTERNAL=3
 //Minor version of cmake used to create the current loaded cache
 CMAKE_CACHE_MINOR_VERSION:INTERNAL=31
 //Patch version of cmake used to create the current loaded cache
-CMAKE_CACHE_PATCH_VERSION:INTERNAL=2
+CMAKE_CACHE_PATCH_VERSION:INTERNAL=6
 //ADVANCED property for variable: CMAKE_COLOR_MAKEFILE
 CMAKE_COLOR_MAKEFILE-ADVANCED:INTERNAL=1
 //Path to CMake executable.
@@ -470,15 +467,13 @@ FFI_LIBRARIES-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: FFI_STATIC_LIBRARIES
 FFI_STATIC_LIBRARIES-ADVANCED:INTERNAL=1
 //Details about finding CURL
-FIND_PACKAGE_MESSAGE_DETAILS_CURL:INTERNAL=[/usr/lib/libcurl.so][/usr/include][c ][v8.11.0()]
+FIND_PACKAGE_MESSAGE_DETAILS_CURL:INTERNAL=[/usr/lib/libcurl.so][/usr/include][c ][v8.12.1()]
 //Details about finding FFI
 FIND_PACKAGE_MESSAGE_DETAILS_FFI:INTERNAL=[/usr/lib/libffi.so][1][v()]
 //Details about finding LibEdit
 FIND_PACKAGE_MESSAGE_DETAILS_LibEdit:INTERNAL=[/usr/include][/usr/lib/libedit.so][v2.11()]
 //Details about finding LibXml2
-FIND_PACKAGE_MESSAGE_DETAILS_LibXml2:INTERNAL=[/usr/lib/libxml2.so][/usr/include/libxml2][v2.13.5()]
-//Details about finding Terminfo
-FIND_PACKAGE_MESSAGE_DETAILS_Terminfo:INTERNAL=[/usr/lib/libtinfo.so][1][v()]
+FIND_PACKAGE_MESSAGE_DETAILS_LibXml2:INTERNAL=[/usr/lib/libxml2.so][/usr/include/libxml2][v2.13.6()]
 //Details about finding Threads
 FIND_PACKAGE_MESSAGE_DETAILS_Threads:INTERNAL=[TRUE][v()]
 //Details about finding ZLIB
@@ -523,16 +518,16 @@ PC_CURL_STATIC_CFLAGS:INTERNAL=-I/usr/include;-DCURL_STATICLIB
 PC_CURL_STATIC_CFLAGS_I:INTERNAL=
 PC_CURL_STATIC_CFLAGS_OTHER:INTERNAL=-DCURL_STATICLIB
 PC_CURL_STATIC_INCLUDE_DIRS:INTERNAL=/usr/include
-PC_CURL_STATIC_LDFLAGS:INTERNAL=-L/usr/lib;-lcurl;-Wl,-O1;-Wl,--sort-common;-Wl,--as-needed;-Wl,-z,relro;-Wl,-z,now;-Wl,-z,pack-relative-relocs;-flto=auto;-lnghttp3;-lssh2;-lssl;-lcrypto;-lssl;-lcrypto;-lidn2;-L/usr/lib;-lunistring;-lbrotlidec;-lbrotlicommon;-lzstd;-lgssapi_krb5;-lkrb5;-lk5crypto;-lcom_err;-lkrb5support;-lpsl;-lssh2;-lssl;-lcrypto;-L/usr/lib;-L/usr/lib;-lssl;-lcrypto;-ldl;-pthread;-lz;-lnghttp2;-lnghttp3
-PC_CURL_STATIC_LDFLAGS_OTHER:INTERNAL=-Wl,-O1;-Wl,--sort-common;-Wl,--as-needed;-Wl,-z,relro;-Wl,-z,now;-Wl,-z,pack-relative-relocs;-flto=auto;-pthread
+PC_CURL_STATIC_LDFLAGS:INTERNAL=-L/usr/lib;-lcurl;-lssh2;-lssl;-lcrypto;-lcrypto;-lz;-lidn2;-L/usr/lib;-lunistring;-lbrotlidec;-lbrotlicommon;-lzstd;-lgssapi_krb5;-lkrb5;-lk5crypto;-lcom_err;-lkrb5support;-lssl;-lpsl;-lssh2;-L/usr/lib;-lssl;-L/usr/lib;-L/usr/lib;-lcrypto;-ldl;-pthread;-lz;-lnghttp2;-lnghttp3
+PC_CURL_STATIC_LDFLAGS_OTHER:INTERNAL=-pthread
 PC_CURL_STATIC_LIBDIR:INTERNAL=
-PC_CURL_STATIC_LIBRARIES:INTERNAL=curl;nghttp3;ssh2;ssl;crypto;ssl;crypto;idn2;unistring;brotlidec;brotlicommon;zstd;gssapi_krb5;krb5;k5crypto;com_err;krb5support;psl;ssh2;ssl;crypto;ssl;crypto;dl;z;nghttp2;nghttp3
-PC_CURL_STATIC_LIBRARY_DIRS:INTERNAL=/usr/lib;/usr/lib;/usr/lib;/usr/lib
+PC_CURL_STATIC_LIBRARIES:INTERNAL=curl;ssh2;ssl;crypto;crypto;z;idn2;unistring;brotlidec;brotlicommon;zstd;gssapi_krb5;krb5;k5crypto;com_err;krb5support;ssl;psl;ssh2;ssl;crypto;dl;z;nghttp2;nghttp3
+PC_CURL_STATIC_LIBRARY_DIRS:INTERNAL=/usr/lib;/usr/lib;/usr/lib;/usr/lib;/usr/lib
 PC_CURL_STATIC_LIBS:INTERNAL=
 PC_CURL_STATIC_LIBS_L:INTERNAL=
 PC_CURL_STATIC_LIBS_OTHER:INTERNAL=
 PC_CURL_STATIC_LIBS_PATHS:INTERNAL=
-PC_CURL_VERSION:INTERNAL=8.11.0
+PC_CURL_VERSION:INTERNAL=8.12.1
 PC_CURL_libcurl_INCLUDEDIR:INTERNAL=
 PC_CURL_libcurl_LIBDIR:INTERNAL=
 PC_CURL_libcurl_PREFIX:INTERNAL=
@@ -593,8 +588,8 @@ PC_LIBXML_STATIC_CFLAGS:INTERNAL=-I/usr/include/libxml2;-I/usr/include;-DLZMA_AP
 PC_LIBXML_STATIC_CFLAGS_I:INTERNAL=
 PC_LIBXML_STATIC_CFLAGS_OTHER:INTERNAL=-DLZMA_API_STATIC
 PC_LIBXML_STATIC_INCLUDE_DIRS:INTERNAL=/usr/include/libxml2;/usr/include
-PC_LIBXML_STATIC_LDFLAGS:INTERNAL=-L/usr/lib;-lxml2;-lm;-lz;-llzma;-pthread;-lpthread;-licui18n;-licuuc;-licudata;-lpthread;-lm
-PC_LIBXML_STATIC_LDFLAGS_OTHER:INTERNAL=-pthread
+PC_LIBXML_STATIC_LDFLAGS:INTERNAL=-L/usr/lib;-lxml2;-lm;-pthread;-lz;-llzma;-pthread;-lpthread;-licui18n;-licuuc;-licudata;-lpthread;-lm
+PC_LIBXML_STATIC_LDFLAGS_OTHER:INTERNAL=-pthread;-pthread
 PC_LIBXML_STATIC_LIBDIR:INTERNAL=
 PC_LIBXML_STATIC_LIBRARIES:INTERNAL=xml2;m;z;lzma;pthread;icui18n;icuuc;icudata;pthread;m
 PC_LIBXML_STATIC_LIBRARY_DIRS:INTERNAL=/usr/lib
@@ -602,7 +597,7 @@ PC_LIBXML_STATIC_LIBS:INTERNAL=
 PC_LIBXML_STATIC_LIBS_L:INTERNAL=
 PC_LIBXML_STATIC_LIBS_OTHER:INTERNAL=
 PC_LIBXML_STATIC_LIBS_PATHS:INTERNAL=
-PC_LIBXML_VERSION:INTERNAL=2.13.5
+PC_LIBXML_VERSION:INTERNAL=2.13.6
 PC_LIBXML_libxml-2.0_INCLUDEDIR:INTERNAL=
 PC_LIBXML_libxml-2.0_LIBDIR:INTERNAL=
 PC_LIBXML_libxml-2.0_PREFIX:INTERNAL=
@@ -611,12 +606,6 @@ PC_LIBXML_libxml-2.0_VERSION:INTERNAL=
 PKG_CONFIG_ARGN-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: PKG_CONFIG_EXECUTABLE
 PKG_CONFIG_EXECUTABLE-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: Terminfo_LIBRARIES
-Terminfo_LIBRARIES-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: Terminfo_LINKABLE
-Terminfo_LINKABLE-ADVANCED:INTERNAL=1
-//Test Terminfo_LINKABLE
-Terminfo_LINKABLE:INTERNAL=1
 //ADVANCED property for variable: ZLIB_INCLUDE_DIR
 ZLIB_INCLUDE_DIR-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: ZLIB_LIBRARY_DEBUG
