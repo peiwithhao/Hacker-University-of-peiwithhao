@@ -56,7 +56,7 @@ static constexpr char PassName[] = "Found Struct Type";
 static constexpr char PluginName[] = "FindStruct";
 
 PreservedAnalyses FindStructPrinter::run(llvm::Module &M, llvm::ModuleAnalysisManager &MAM){
-    // auto &Struct_vector = MAM.getResult<FindStruct>(M);
+    //auto &Struct_vector = MAM.getResult<FindStruct>(M);
     printStructTypes(OS, M);
     return PreservedAnalyses::all();
 }

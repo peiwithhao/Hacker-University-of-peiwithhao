@@ -28,7 +28,7 @@ CMAKE_BUILD_TYPE:STRING=
 CMAKE_COLOR_MAKEFILE:BOOL=ON
 
 //CXX compiler
-CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++
+CMAKE_CXX_COMPILER:STRING=/usr/bin/c++
 
 //A wrapper around 'ar' adding the appropriate '--plugin' option
 // for the GCC compiler
@@ -56,7 +56,7 @@ CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG
 CMAKE_CXX_STANDARD:STRING=17
 
 //C compiler
-CMAKE_C_COMPILER:FILEPATH=/usr/bin/cc
+CMAKE_C_COMPILER:STRING=/usr/bin/cc
 
 //A wrapper around 'ar' adding the appropriate '--plugin' option
 // for the GCC compiler
@@ -314,7 +314,7 @@ CMAKE_CACHE_MAJOR_VERSION:INTERNAL=3
 //Minor version of cmake used to create the current loaded cache
 CMAKE_CACHE_MINOR_VERSION:INTERNAL=31
 //Patch version of cmake used to create the current loaded cache
-CMAKE_CACHE_PATCH_VERSION:INTERNAL=2
+CMAKE_CACHE_PATCH_VERSION:INTERNAL=6
 //ADVANCED property for variable: CMAKE_COLOR_MAKEFILE
 CMAKE_COLOR_MAKEFILE-ADVANCED:INTERNAL=1
 //Path to CMake executable.
@@ -470,13 +470,13 @@ FFI_LIBRARIES-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: FFI_STATIC_LIBRARIES
 FFI_STATIC_LIBRARIES-ADVANCED:INTERNAL=1
 //Details about finding CURL
-FIND_PACKAGE_MESSAGE_DETAILS_CURL:INTERNAL=[/usr/lib/libcurl.so][/usr/include][c ][v8.11.0()]
+FIND_PACKAGE_MESSAGE_DETAILS_CURL:INTERNAL=[/usr/lib/libcurl.so][/usr/include][c ][v8.12.1()]
 //Details about finding FFI
 FIND_PACKAGE_MESSAGE_DETAILS_FFI:INTERNAL=[/usr/lib/libffi.so][1][v()]
 //Details about finding LibEdit
 FIND_PACKAGE_MESSAGE_DETAILS_LibEdit:INTERNAL=[/usr/include][/usr/lib/libedit.so][v2.11()]
 //Details about finding LibXml2
-FIND_PACKAGE_MESSAGE_DETAILS_LibXml2:INTERNAL=[/usr/lib/libxml2.so][/usr/include/libxml2][v2.13.5()]
+FIND_PACKAGE_MESSAGE_DETAILS_LibXml2:INTERNAL=[/usr/lib/libxml2.so][/usr/include/libxml2][v2.13.6()]
 //Details about finding Terminfo
 FIND_PACKAGE_MESSAGE_DETAILS_Terminfo:INTERNAL=[/usr/lib/libtinfo.so][1][v()]
 //Details about finding Threads
@@ -613,8 +613,6 @@ PKG_CONFIG_ARGN-ADVANCED:INTERNAL=1
 PKG_CONFIG_EXECUTABLE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: Terminfo_LIBRARIES
 Terminfo_LIBRARIES-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: Terminfo_LINKABLE
-Terminfo_LINKABLE-ADVANCED:INTERNAL=1
 //Test Terminfo_LINKABLE
 Terminfo_LINKABLE:INTERNAL=1
 //ADVANCED property for variable: ZLIB_INCLUDE_DIR

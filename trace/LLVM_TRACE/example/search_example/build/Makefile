@@ -94,8 +94,9 @@ all: cmake_check_build_system
 
 # The main codegen target
 codegen: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles /home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build//CMakeFiles/progress.marks
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold "Finished generating code"
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles 0
 .PHONY : codegen
 
 # The main clean target
@@ -162,6 +163,32 @@ acc_gen/fast:
 .PHONY : acc_gen/fast
 
 #=============================================================================
+# Target rules for targets named ARMTargetParserTableGen
+
+# Build rule for target.
+ARMTargetParserTableGen: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ARMTargetParserTableGen
+.PHONY : ARMTargetParserTableGen
+
+# fast build rule for target.
+ARMTargetParserTableGen/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ARMTargetParserTableGen.dir/build.make CMakeFiles/ARMTargetParserTableGen.dir/build
+.PHONY : ARMTargetParserTableGen/fast
+
+#=============================================================================
+# Target rules for targets named AArch64TargetParserTableGen
+
+# Build rule for target.
+AArch64TargetParserTableGen: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 AArch64TargetParserTableGen
+.PHONY : AArch64TargetParserTableGen
+
+# fast build rule for target.
+AArch64TargetParserTableGen/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AArch64TargetParserTableGen.dir/build.make CMakeFiles/AArch64TargetParserTableGen.dir/build
+.PHONY : AArch64TargetParserTableGen/fast
+
+#=============================================================================
 # Target rules for targets named RISCVTargetParserTableGen
 
 # Build rule for target.
@@ -217,8 +244,11 @@ help:
 	@echo "... all (the default if no target is provided)"
 	@echo "... clean"
 	@echo "... depend"
+	@echo "... codegen"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
+	@echo "... AArch64TargetParserTableGen"
+	@echo "... ARMTargetParserTableGen"
 	@echo "... RISCVTargetParserTableGen"
 	@echo "... acc_gen"
 	@echo "... intrinsics_gen"

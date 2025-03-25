@@ -78,6 +78,8 @@ preinstall:
 clean: CMakeFiles/intrinsics_gen.dir/clean
 clean: CMakeFiles/omp_gen.dir/clean
 clean: CMakeFiles/acc_gen.dir/clean
+clean: CMakeFiles/ARMTargetParserTableGen.dir/clean
+clean: CMakeFiles/AArch64TargetParserTableGen.dir/clean
 clean: CMakeFiles/RISCVTargetParserTableGen.dir/clean
 clean: CMakeFiles/FindStruct.dir/clean
 .PHONY : clean
@@ -106,6 +108,7 @@ intrinsics_gen: CMakeFiles/intrinsics_gen.dir/rule
 # codegen rule for target.
 CMakeFiles/intrinsics_gen.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/intrinsics_gen.dir/build.make CMakeFiles/intrinsics_gen.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles --progress-num= "Finished codegen for target intrinsics_gen"
 .PHONY : CMakeFiles/intrinsics_gen.dir/codegen
 
 # clean rule for target.
@@ -137,6 +140,7 @@ omp_gen: CMakeFiles/omp_gen.dir/rule
 # codegen rule for target.
 CMakeFiles/omp_gen.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/omp_gen.dir/build.make CMakeFiles/omp_gen.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles --progress-num= "Finished codegen for target omp_gen"
 .PHONY : CMakeFiles/omp_gen.dir/codegen
 
 # clean rule for target.
@@ -168,12 +172,77 @@ acc_gen: CMakeFiles/acc_gen.dir/rule
 # codegen rule for target.
 CMakeFiles/acc_gen.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/acc_gen.dir/build.make CMakeFiles/acc_gen.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles --progress-num= "Finished codegen for target acc_gen"
 .PHONY : CMakeFiles/acc_gen.dir/codegen
 
 # clean rule for target.
 CMakeFiles/acc_gen.dir/clean:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/acc_gen.dir/build.make CMakeFiles/acc_gen.dir/clean
 .PHONY : CMakeFiles/acc_gen.dir/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/ARMTargetParserTableGen.dir
+
+# All Build rule for target.
+CMakeFiles/ARMTargetParserTableGen.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ARMTargetParserTableGen.dir/build.make CMakeFiles/ARMTargetParserTableGen.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ARMTargetParserTableGen.dir/build.make CMakeFiles/ARMTargetParserTableGen.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles --progress-num= "Built target ARMTargetParserTableGen"
+.PHONY : CMakeFiles/ARMTargetParserTableGen.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/ARMTargetParserTableGen.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles 0
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/ARMTargetParserTableGen.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles 0
+.PHONY : CMakeFiles/ARMTargetParserTableGen.dir/rule
+
+# Convenience name for target.
+ARMTargetParserTableGen: CMakeFiles/ARMTargetParserTableGen.dir/rule
+.PHONY : ARMTargetParserTableGen
+
+# codegen rule for target.
+CMakeFiles/ARMTargetParserTableGen.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ARMTargetParserTableGen.dir/build.make CMakeFiles/ARMTargetParserTableGen.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles --progress-num= "Finished codegen for target ARMTargetParserTableGen"
+.PHONY : CMakeFiles/ARMTargetParserTableGen.dir/codegen
+
+# clean rule for target.
+CMakeFiles/ARMTargetParserTableGen.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ARMTargetParserTableGen.dir/build.make CMakeFiles/ARMTargetParserTableGen.dir/clean
+.PHONY : CMakeFiles/ARMTargetParserTableGen.dir/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/AArch64TargetParserTableGen.dir
+
+# All Build rule for target.
+CMakeFiles/AArch64TargetParserTableGen.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AArch64TargetParserTableGen.dir/build.make CMakeFiles/AArch64TargetParserTableGen.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AArch64TargetParserTableGen.dir/build.make CMakeFiles/AArch64TargetParserTableGen.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles --progress-num= "Built target AArch64TargetParserTableGen"
+.PHONY : CMakeFiles/AArch64TargetParserTableGen.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/AArch64TargetParserTableGen.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles 0
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/AArch64TargetParserTableGen.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles 0
+.PHONY : CMakeFiles/AArch64TargetParserTableGen.dir/rule
+
+# Convenience name for target.
+AArch64TargetParserTableGen: CMakeFiles/AArch64TargetParserTableGen.dir/rule
+.PHONY : AArch64TargetParserTableGen
+
+# codegen rule for target.
+CMakeFiles/AArch64TargetParserTableGen.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AArch64TargetParserTableGen.dir/build.make CMakeFiles/AArch64TargetParserTableGen.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles --progress-num= "Finished codegen for target AArch64TargetParserTableGen"
+.PHONY : CMakeFiles/AArch64TargetParserTableGen.dir/codegen
+
+# clean rule for target.
+CMakeFiles/AArch64TargetParserTableGen.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/AArch64TargetParserTableGen.dir/build.make CMakeFiles/AArch64TargetParserTableGen.dir/clean
+.PHONY : CMakeFiles/AArch64TargetParserTableGen.dir/clean
 
 #=============================================================================
 # Target rules for target CMakeFiles/RISCVTargetParserTableGen.dir
@@ -199,6 +268,7 @@ RISCVTargetParserTableGen: CMakeFiles/RISCVTargetParserTableGen.dir/rule
 # codegen rule for target.
 CMakeFiles/RISCVTargetParserTableGen.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/RISCVTargetParserTableGen.dir/build.make CMakeFiles/RISCVTargetParserTableGen.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles --progress-num= "Finished codegen for target RISCVTargetParserTableGen"
 .PHONY : CMakeFiles/RISCVTargetParserTableGen.dir/codegen
 
 # clean rule for target.
@@ -230,6 +300,7 @@ FindStruct: CMakeFiles/FindStruct.dir/rule
 # codegen rule for target.
 CMakeFiles/FindStruct.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/FindStruct.dir/build.make CMakeFiles/FindStruct.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/example/search_example/build/CMakeFiles --progress-num=1,2 "Finished codegen for target FindStruct"
 .PHONY : CMakeFiles/FindStruct.dir/codegen
 
 # clean rule for target.
