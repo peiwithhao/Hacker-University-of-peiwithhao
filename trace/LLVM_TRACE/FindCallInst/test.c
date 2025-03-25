@@ -1,0 +1,58 @@
+#define _GNU_SOURCE
+#include <signal.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
+void func_a(){
+    printf("func_a is here \n");
+}
+
+void func_b(){
+    printf("func_b is here \n");
+}
+size_t global_a = 0;
+
+static size_t global_static_b = 1;
+
+void asmlike(){
+    asm volatile("push %%rax;"
+                 "pop %%rdi;"
+                 "mov %%rax, 39;"
+                "syscall;"
+                ::);
+}
+
+int main(void){
+    global_a = 1;
+    global_static_b = 2;
+    int test_nm = 0;
+    scanf("%d", &test_nm);
+    if(test_nm == 16){
+        scanf("%d", &test_nm);
+        if(test_nm == 17){
+            scanf("%d", &test_nm);
+            if(test_nm == 18){
+                scanf("%d", &test_nm);
+                    if(test_nm == 19){
+                        scanf("%d", &test_nm);
+                            if(test_nm == 20){
+                                func_a();
+                                printf("Nice!\n");
+                                return 0;
+                            }
+                    }
+            }
+        }
+    }
+    func_b();
+    pid_t tid;
+    tid = syscall(SYS_gettid);
+    syscall(SYS_tgkill, getpid(), tid, SIGHUP);
+    printf("No Nice\n");
+    asmlike();
+    return 1;
+
+}
+

@@ -1,0 +1,9 @@
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/FindCallInst/build/CMakeFiles/intrinsics_gen.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/FindCallInst/build/CMakeFiles/omp_gen.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/FindCallInst/build/CMakeFiles/acc_gen.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/FindCallInst/build/CMakeFiles/ARMTargetParserTableGen.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/FindCallInst/build/CMakeFiles/AArch64TargetParserTableGen.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/FindCallInst/build/CMakeFiles/RISCVTargetParserTableGen.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/FindCallInst/build/CMakeFiles/FindCallInst.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/FindCallInst/build/CMakeFiles/edit_cache.dir
+/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/FindCallInst/build/CMakeFiles/rebuild_cache.dir

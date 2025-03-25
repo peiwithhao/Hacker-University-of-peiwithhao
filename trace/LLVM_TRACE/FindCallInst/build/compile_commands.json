@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/FindCallInst/build",
+  "command": "/usr/bin/c++ -DFindCallInst_EXPORTS -I/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/FindCallInst/./include -fPIC -o CMakeFiles/FindCallInst.dir/src/FindCallInst.cpp.o -c /home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/FindCallInst/src/FindCallInst.cpp",
+  "file": "/home/peiwithhao/repo/Hacker-University-of-peiwithhao/trace/LLVM_TRACE/FindCallInst/src/FindCallInst.cpp",
+  "output": "CMakeFiles/FindCallInst.dir/src/FindCallInst.cpp.o"
+}
+]
