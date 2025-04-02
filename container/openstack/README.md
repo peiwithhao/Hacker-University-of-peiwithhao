@@ -40,7 +40,7 @@
 + openstack: 
 
 ## 配置环境
-初始仅考虑三节点环境
+初始仅考虑四节点环境
 
 + node1:
     role: controller
@@ -54,6 +54,11 @@
 
 + node3:
     role: compute
+    发行版: Ubuntu 24.04LTS
+    内核: 6.8.0
+
++ node4: 
+    role: storage
     发行版: Ubuntu 24.04LTS
     内核: 6.8.0
 
@@ -84,8 +89,10 @@
 ```sh
 127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
 ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
-192.168.122.10       openstack-cotroller.iie.com
-192.168.122.11       openstack-controller.iie.com
+192.168.122.10 openstack-controller.iie.com
+192.168.122.11 openstack-compute1.iie.com
+192.168.122.12 openstack-compute2.iie.com
+192.168.122.13 openstack-storage.iie.com
 ```
 
 ### 关闭防火墙和Selinux/AppArmor
@@ -125,7 +132,17 @@ sudo systemctl restart chrony && sudo systemctl enable chrony
 在计算节点
 ```sh
 sudo apt instal chrony
-echo "source 192.168.122.10" >> /etc/chrony/chrony.conf
+echo "server 192.168.122.10" >> /etc/chrony/chrony.conf
+sudo systemctl restart chrony && sudo systemctl enable chrony
+sudo chronyc sources     # 查看支持的ntp服务器
+```
+
+
+在存储节点
+
+```sh
+sudo apt instal chrony
+echo "server 192.168.122.10" >> /etc/chrony/chrony.conf
 sudo systemctl restart chrony && sudo systemctl enable chrony
 sudo chronyc sources     # 查看支持的ntp服务器
 ```
@@ -145,6 +162,10 @@ vim /etc/mysql/mariadb.conf.d/50-server.cnf
 cat /etc/mysql/mariadb.conf.d/50-server.cnf
 sudo mysql_secure_installation  # 过程中会要求输入密码
 ```
+
+> [!important]
+> 为了之后存储节点的远程访问，这里需要修改`/etc/mariadb/`下的配置文件，将`bind = 127.0.0.1`改为`bind = 0.0.0.0`
+
 
 ### 消息队列RabbitMQ
 他是一个消息队列管理框架,ubuntu 24.04通过下面的方式安装
@@ -545,6 +566,17 @@ su -s /bin/sh -c "nova-manage cell_v2 list_cells" nova
 ```sh
 apt install nova-compute
 ```
+然后对于其中的配置文件建议参考[官网文档](https://docs.openstack.org/nova/latest//install/compute-install-ubuntu.html)
+
+配置好计算节点后，在控制节点执行下面命令
+```sh
+openstack compute service list --service nova-compute  # 查看是否有计算主机
+su -s /bin/sh -c "nova-manage cell_v2 discover_hosts --verbose" nova  # 发现计算主机
+
+```
+
+
+
 
 ## Neutron 安装
 
@@ -568,6 +600,18 @@ apt install neutron-server neutron-plugin-ml2 \
 ```
 
 配置文件可以参考[https://www.cnblogs.com/thesungod/p/17612213.html](https://www.cnblogs.com/thesungod/p/17612213.html)
+和[https://docs.openstack.org/mitaka/zh_CN/install-guide-rdo/neutron-controller-install-option1.html](https://docs.openstack.org/mitaka/zh_CN/install-guide-rdo/neutron-controller-install-option1.html)
+
+这里对于网络的配置需要构建一个提供者网络，需要在使用控制节点网络的情况下用openstack创建一个网络和子网络
+配置参考[https://docs.openstack.org/install-guide/launch-instance-networks-provider.html](https://docs.openstack.org/install-guide/launch-instance-networks-provider.html)
+我的子网配置如下：
+```sh
+root@controller:/home/control_user# openstack subnet create --network provider \
+>  --allocation-pool start=192.168.122.101,end=192.168.122.250 \
+>  --dns-nameserver 8.8.8.8 --gateway 192.168.122.1 \
+>  --subnet-range 192.168.122.0/24 provider
+```
+
 
 
 正式安装
@@ -575,7 +619,8 @@ apt install neutron-server neutron-plugin-ml2 \
 su -s /bin/sh -c "neutron-db-manage --config-file /etc/neutron/neutron.conf \
   --config-file /etc/neutron/plugins/ml2/ml2_conf.ini upgrade head" neutron
 ```
-万事后重启nova和一些neutron的服务
+完事后重启nova和一些neutron的服务
+
 
 ```sh
 service neutron-server restart
@@ -587,9 +632,84 @@ service neutron-metadata-agent restart
 ### 计算节点的配置
 首先安装相关包
 ```sh
-sudo apt install -y neutron-linuxbridge-agent ebtables ipset
+apt install neutron-openvswitch-agent
 ```
 
+然后根据官方文档进行相关配置
+需要注意的是在控制节点和计算节点的网络结构需要一致
+
+
+完成这一切后可以到控制节点进行验证
+```sh
+openstack network agent list  #验证 neutron agent成功
+```
+
+
+
+## Cinder配置
+该服务被用来作为持久化虚拟机内容,
+### 控制节点的配置
+1. 创建cinder数据库用户,步骤同之前一致
+2. 创建openstack用户，服务和权限配置
+```sh
+
+openstack user create --domain default --password-prompt cinder
+openstack role add --project service --user cinder admin
+openstack service create --name cinderv3 \
+  --description "OpenStack Block Storage" volumev3
+```
+3. 创建endpoint
+```sh
+openstack endpoint create --region RegionOne volumev3 public http://controller:8776/v3/%\(project_id\)s
+openstack endpoint create --region RegionOne volumev3 admin http://controller:8776/v3/%\(project_id\)s
+openstack endpoint create --region RegionOne volumev3 internal http://controller:8776/v3/%\(project_id\)s
+```
+4. 安装并配置组件
+```sh
+ apt install cinder-api cinder-scheduler
+```
+修改配置文件`/etc/cinder/cinder.conf`
+
+5. 同步数据库
+```sh
+su -s /bin/sh -c "cinder-manage db sync" cinder
+```
+
+6. 配置nova的cinder部分`/etc/nova/nova.conf`
+将`[cinder]`部分的region添加上去`ReginOne`,最后重启`nova-api, cinder-scheduler和apache21`
+
+### 存储节点的配置
+1. 安装对应包
+```sh
+apt install lvm2 thin-provisioning-tools
+```
+
+2. 准备对应硬盘,这里可以直接虚拟化出来一个100G的,然后进行格式化，创建物理卷
+```sh
+pvcreate /dev/vdb
+vgcreate cinder-volumes /dev/vdb
+```
+3. 配置`/etc/lvm/lvm.conf`
+```conf
+[device]
+filter = [ "a/vdb/", "r/.*/"]
+```
+这里表示只接受vdb盘，其他盘拒绝
+
+4. 安装cinder-volume服务
+```sh
+apt install cinder-volume tgt
+```
+
+5. 配置cinder配置文件`/etc/cinder/cinder-volume/`,参考[https://docs.openstack.org/cinder/latest/install/cinder-storage-install-ubuntu.html](https://docs.openstack.org/cinder/latest/install/cinder-storage-install-ubuntu.html)
+6. 重启服务
+
+## Horizon安装
+官方提供web界面管理
+1. 安装相应包
+```sh
+apt install -y openstack-dashboard
+```
 
 # 参考
 [https://ubuntu.com/tutorials/install-openstack-on-your-workstation-and-launch-your-first-instance#2-install-openstack](https://ubuntu.com/tutorials/install-openstack-on-your-workstation-and-launch-your-first-instance#2-install-openstack)
