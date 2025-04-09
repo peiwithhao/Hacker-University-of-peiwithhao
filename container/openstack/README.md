@@ -77,6 +77,7 @@
 + 192.168.122.10(controller)
 + 192.168.122.11(compute1)
 + 192.168.122.12(compute2)
++ 192.168.122.13(storage)
 
 
 > [!note]
@@ -269,45 +270,6 @@ sudo a2enmod wsgi    #启动必要模块，一般来说都已经启动
 sudo a2enmod rewrite
 ```
 
-创建keystone配置文件,位于
-`/etc/apache2/sites-available/wsgi-keystone.conf`
-
-填入:
-```sh
-
-Listen 5000
-Listen 35357
-
-<VirtualHost *:5000>
-    WSGIDaemonProcess keystone-public processes=5 threads=1 user=keystone group=keystone display-name=%{GROUP}
-    WSGIProcessGroup keystone-public
-    WSGIScriptAlias / /usr/bin/keystone-wsgi-public
-    WSGIApplicationGroup %{GLOBAL}
-    WSGIPassAuthorization On
-    ErrorLogFormat "%{cu}t %M"
-    ErrorLog /var/log/apache2/keystone-error.log
-    CustomLog /var/log/apache2/keystone-access.log combined
-
-    <Directory /usr/bin>
-        Require all granted
-    </Directory>
-</VirtualHost>
-
-<VirtualHost *:35357>
-    WSGIDaemonProcess keystone-admin processes=5 threads=1 user=keystone group=keystone display-name=%{GROUP}
-    WSGIProcessGroup keystone-admin
-    WSGIScriptAlias / /usr/bin/keystone-wsgi-admin
-    WSGIApplicationGroup %{GLOBAL}
-    WSGIPassAuthorization On
-    ErrorLogFormat "%{cu}t %M"
-    ErrorLog /var/log/apache2/keystone-error.log
-    CustomLog /var/log/apache2/keystone-access.log combined
-
-    <Directory /usr/bin>
-        Require all granted
-    </Directory>
-</VirtualHost>
-```
 
 然后启用keystone站点
 ```sh
@@ -535,6 +497,8 @@ apt install nova-api nova-conductor nova-novncproxy nova-scheduler
 ```
 
 配置文件，参考[官网](https://docs.openstack.org/nova/latest//install/controller-install-ubuntu.html)
+> [!important]
+> 这里官网有一个失误就是在[service_user]下的`auth_url`应该是`http://openstack-controller.iie.com:5000/v3`
 
 配置完毕后本地出了一个py库的错误，但是官网说可以忽略所有问题
 
@@ -592,7 +556,7 @@ openstack endpoint create --region RegionOne \
   network public http://controller:9696
 ```
 
-### 按装Neutron
+### 安装Neutron
 ```sh
 apt install neutron-server neutron-plugin-ml2 \
   neutron-openvswitch-agent neutron-dhcp-agent \
@@ -637,6 +601,13 @@ apt install neutron-openvswitch-agent
 
 然后根据官方文档进行相关配置
 需要注意的是在控制节点和计算节点的网络结构需要一致
+
+> [!caution]
+> 当我们使用provider网络时，需要用ovs-vsctl来创建一个新的网桥br-provider, 
+> 然后将物理接口作为一个端口添加到这个网桥当中,
+> 这里需要注意的是添加到网桥后就需要修改该物理接口的dhcp4和dhcp6均为no的状态
+
+
 
 
 完成这一切后可以到控制节点进行验证
@@ -710,7 +681,243 @@ apt install cinder-volume tgt
 ```sh
 apt install -y openstack-dashboard
 ```
+然后按照[官方文档](https://docs.openstack.org/horizon/latest/install/install-ubuntu.html)配置
 
+之后可以通过`http://openstack-controller.iie.com/horizon.`来进行验证
+```sh
+$ curl -i http://openstack-controller.iie.com/horizon
+HTTP/1.1 302 Found
+Date: Thu, 03 Apr 2025 02:54:01 GMT
+Server: Apache/2.4.58 (Ubuntu)
+Location: http://openstack-controller.iie.com/horizon/auth/login/?next=/horizon/
+Content-Length: 0
+X-Frame-Options: DENY
+Vary: Accept-Language,Cookie
+Content-Language: en
+Content-Type: text/html; charset=utf-8
+```
+
+## Designate安装
+主要是参考[官方文档](https://docs.openstack.org/designate/latest/install/install-ubuntu.html)安装，
+该服务主要是用来为iaas集群中的虚拟机资源提供DNS服务
+1. openstack相关配置
+```sh
+source admin-openrc
+openstack user create --domain default --password-prompt designate
+openstack role add --project service --user designate admin
+openstack service create --name designate --description "DNS" dns
+openstack endpoint create --region RegionOne dns public http://openstack-controller.iie.com:9001/
+```
+2. 安装designate
+```sh
+apt-get install designate
+```
+3. 配置mysql
+```mysql
+mysql> CREATE DATABASE designate CHARACTER SET utf8 COLLATE utf8_general_ci;
+mysql> GRANT ALL PRIVILEGES ON designate.* TO 'designate'@'localhost' \
+IDENTIFIED BY 'DESIGNATE_DBPASS';
+mysql> GRANT ALL PRIVILEGES ON designate.* TO 'designate'@'%' \
+IDENTIFIED BY 'DESIGNATE_DBPASS';
+```
+4. 安装DNS软件
+```sh
+apt-get install bind9 bind9utils bind9-doc
+```
+5. 创建RNDC key ,通过这个密钥来管理DNS服务器,这里官网的-r参数已经过时，现在默认就是随机化进行输入
+```sh
+rndc-confgen -a -k designate -c /etc/designate/rndc.key
+```
+
+>[!caution]
+> 这里不知道什么情况control节点的apparmor仍然生肖，只有将rndc.key放到`/etc/bind`目录下才不会出问题
+
+6. 根据官网进行[配置](https://docs.openstack.org/designate/wallaby/install/install-ubuntu.html)
+
+7. 验证
+```sh
+ps -aux | grep designate
+openstack dns service list
+```
+
+8. 配置neutron支持DNS
+```sh
+vim /etc/neutron/neutron.conf
+    [DEFAULT]
+    ...
+    external_dns_driver = designate 
+    dns_domain = iie.com.
+    ...
+    [designate]
+    ...
+    auth_url = http://openstack-controller.iie.com:5000
+    auth_type = password
+    project_domain_name = Default
+    user_domain_name = Default
+    region_name = RegionOne
+    project_name = service
+    username = designate
+    password = designate
+    allow_reverse_dns_lookup = True
+    ipv4_ptr_zone_prefix_size = 24
+    ipv6_ptr_zone_prefix_size = 116
+
+vim /etc/neutron/plugins/ml2/ml2_conf.ini
+    extension_drivers = port_security,dns-integration,auto-allocated-topology
+
+```
+
+9. 创建一个zone区域,管理DNS,支持手动和自动添加记录，使得云内资源可以通过域名访问
+```sh
+openstack zone create --email=admin@iie.com iie.com.
+openstack zone list
+```
+
+
+## Heat安装
+他是一个用于编排云资源的服务。它允许用户通过模板定义和管理云基础设施的部署和配置。
+1. 数据库的创建
+2. openstack用户，服务, endpoint创建
+```sh
+openstack user create --domain default --password-prompt heat
+openstack service create --name heat  --description "Orchestration" orchestration
+openstack service create --name heat-cfn  --description "Orchestration" cloudformation
+openstack endpoint create --region RegionOne cloudformation admin http://openstack-controller.iie.com:8000/v1/%\(tenant_id\)s 
+openstack endpoint create --region RegionOne cloudformation public http://openstack-controller.iie.com:8000/v1/%\(tenant_id\)s 
+openstack endpoint create --region RegionOne cloudformation internal http://openstack-controller.iie.com:8000/v1/%\(tenant_id\)s 
+openstack endpoint create --region RegionOne orchestration admin http://openstack-controller.iie.com:8004/v1/%\(tenant_id\)s 
+openstack endpoint create --region RegionOne orchestration internal http://openstack-controller.iie.com:8004/v1/%\(tenant_id\)s 
+openstack endpoint create --region RegionOne orchestration public http://openstack-controller.iie.com:8004/v1/%\(tenant_id\)s 
+```
+
+3. 编排需要身份服务中的其他信息来管理栈,所以额外创建一个区域用来存储用户和项目的stack
+```sh
+ openstack domain create --description "Stack projects and users" heat
+```
+4. 在新创建的domain里面创建`head_domain_admin`
+```sh
+openstack user create --domain heat --password-prompt heat_domain_admin
+```
+
+5. 赋予admin权限
+```sh
+openstack role add --domain heat --user-domain heat --user heat_domain_admin admin
+```
+6. 创建`heat_stack_owner`的role
+```sh
+openstack role create heat_stack_owner
+```
+7. 给之前创建的demo用户赋予该权限
+```sh
+openstack role add --project demo --user demo heat_stack_owner
+```
+8. 创建`heat_stack_user`的role
+```sh
+openstack role create heat_stack_user
+```
+9. 下载对应包`apt install heat-api heat-api-cfn heat-engine`
+10. 根据[官网配置](https://docs.openstack.org/heat/2023.1/install/install-ubuntu.html)
+11. 根据`openstack orchestration service list`进行验证
+```text
++------------+-------------+--------------------------------------+------------+--------+----------------------------+--------+
+| Hostname   | Binary      | Engine ID                            | Host       | Topic  | Updated At                 | Status |
++------------+-------------+--------------------------------------+------------+--------+----------------------------+--------+
+| controller | heat-engine | 93bff927-bc13-4ccc-a109-8fbd678cf4b1 | controller | engine | 2025-04-03T10:05:07.000000 | up     |
+| controller | heat-engine | 399a38d4-6cdd-41cd-8374-a2867740e83a | controller | engine | 2025-04-03T10:05:07.000000 | up     |
+| controller | heat-engine | 973c2282-9a24-4fd2-aed3-b62111f25c09 | controller | engine | 2025-04-03T10:05:07.000000 | up     |
+| controller | heat-engine | 3edc9008-4fd8-4276-9fb0-43e9e8fd0ab5 | controller | engine | 2025-04-03T10:05:07.000000 | up     |
+| controller | heat-engine | 32dbff39-6a7e-4546-95d1-5ed19b50a675 | controller | engine | 2025-04-03T10:05:07.000000 | up     |
+| controller | heat-engine | f3ce0fd4-f64a-4595-bfe3-9477e9fc1eae | controller | engine | 2025-04-03T10:05:07.000000 | up     |
+| controller | heat-engine | 51b5aa4b-c701-4aba-804d-167d1a08198e | controller | engine | 2025-04-03T10:05:07.000000 | up     |
+| controller | heat-engine | 03d8a414-d52d-44b6-883b-8fe7d42931da | controller | engine | 2025-04-03T10:05:07.000000 | up     |
++------------+-------------+--------------------------------------+------------+--------+----------------------------+--------+
+```
+
+
+## 创建一个实例
+1. 创建物理机器的偏好
+```sh
+openstack flavor create --id 0 --vcpus 1 --ram 64 --disk 1 m1.nano
+openstack flavor list
+```
+2. 生成key
+```sh
+ssh-keygen -q -t rsa -b 2048 -N "" -f /home/control_user/test_rsa
+openstack keypair create --public-key /home/control_user/test_rsa.pub mykey
+openstack keypair list #查看
+```
+
+3. 创建安全组以允许远程连接和ICMP访问
+```sh
+openstack security group rule create --proto icmp default
+openstack security group rule create --proto tcp --dst-port 22 default
+```
+
+4. 创建存储设备
+```sh
+openstack volume create --size 1 volume_test 
+openstack volume list # 观察创建的volume_test状态变为available
+```
+
+5. 手动创建实例
+```sh
+openstack server create --flavor m1.tiny --image cirros \
+  --nic net-id=b5b6993c-ddf9-40e7-91d0-86806a42edb8 --security-group default \
+  --key-name mykey "provider-instance"  
+```
+
+当然除此之外也可以利用好heat engine，可以通过创建stack模板的方式来更便捷的生成server
+
+6. 创建下面的yaml文件
+```yaml
+heat_template_version: 2015-10-15
+description: Launch a basic instance with CirrOS image using the
+             ``m1.tiny`` flavor, ``mykey`` key,  and one network.
+
+parameters:
+  NetID:
+    type: string
+    description: Network ID to use for the instance.
+
+resources:
+  server:
+    type: OS::Nova::Server
+    properties:
+      image: cirros
+      flavor: m1.tiny
+      key_name: mykey
+      networks:
+      - network: { get_param: NetID }
+
+outputs:
+  instance_name:
+    description: Name of the instance.
+    value: { get_attr: [ server, name ] }
+  instance_ip:
+    description: IP address of the instance.
+    value: { get_attr: [ server, first_address ] }
+```
+
+7. 使用demo用户的环境变量`source demo-openrc`, 然后查看网络`openstack network list`
+8. 设置环境变量`NET_ID`为provider网络的ID
+```sh
+export NET_ID=$(openstack network list | awk '/ provider / { print $2 }')
+```
+9. 创建一个cirrOS实例的栈
+```sh
+openstack stack create -t demo-template.yml --parameter "NetID=$NET_ID" stack
+```
+
+10. 查看当前stack
+```sh
+$ openstack stack list
+--------------------------------------+------------+----------------------------------+-----------------+----------------------+--------------+
+| ID                                   | Stack Name | Project                          | Stack Status    | Creation Time        | Updated Time |
++--------------------------------------+------------+----------------------------------+-----------------+----------------------+--------------+
+| d1bda338-5aeb-40f8-99cd-2b4816360b90 | stack      | 33a65a4df93c4041ba0d0fec36ab56ab | CREATE_COMPLETE | 2025-04-08T01:56:08Z | None         |
++--------------------------------------+------------+----------------------------------+-----------------+----------------------+--------------+
+
+```
 # 参考
 [https://ubuntu.com/tutorials/install-openstack-on-your-workstation-and-launch-your-first-instance#2-install-openstack](https://ubuntu.com/tutorials/install-openstack-on-your-workstation-and-launch-your-first-instance#2-install-openstack)
 [https://canonical.com/microstack/docs/single-node](https://canonical.com/microstack/docs/single-node)
