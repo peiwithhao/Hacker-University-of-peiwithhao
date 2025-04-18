@@ -4,10 +4,8 @@
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/device.h>
-#include "rootkitops.c"
+#include "pwhrootkit.h"
 
-#define DEVICE_NAME "pwhrootkit"
-#define CLASS_NAME "pwhrootkit"
 
 
 static int __init pwh_init(void){

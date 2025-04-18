@@ -206,7 +206,7 @@ void sys_call_table_finder(void){
          : 
      );
      if(hook_ctx->hook_after){
-         hook_ctx->hook_after(&(hook_ctx->regs));
+         hook_ctx->hook_after(&(hook_ctx->regs), (size_t *)&(hook_ctx->ret));
      }
      
      arbitrary_remap_write((void *)hook_ctx->orig_func, hook_ctx->hook_code, hook_ctx->shellcode_nr);
@@ -224,7 +224,7 @@ ssize_t hookpoint_add(struct hook_context *hook_ctx, size_t orig_func, size_t ho
     size_t hook_ctx_ptr;
     /* 保存hook函数 */
     hook_ctx->hook_before = (void (*)(struct pt_regs *))hook_before;
-    hook_ctx->hook_after = (void (*)(struct pt_regs *))hook_after;
+    hook_ctx->hook_after = (void (*)(struct pt_regs *, size_t *))hook_after;
     hook_ctx->orig_func = (void (*)(size_t, size_t, size_t, size_t, size_t, size_t))orig_func;
 
     hook_ctl = (size_t)do_hook;

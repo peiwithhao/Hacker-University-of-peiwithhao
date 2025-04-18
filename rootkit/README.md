@@ -1,6 +1,21 @@
+<!--toc:start-->
+- [行为](#行为)
+  - [1. 提权](#1-提权)
+    - [1.1. 直接修改cred](#11-直接修改cred)
+    - [1.2. 内核pwn常用控制流](#12-内核pwn常用控制流)
+    - [1.3. 提升指定进程权限](#13-提升指定进程权限)
+  - [2. 修改任意地址](#2-修改任意地址)
+  - [hook](#hook)
+    - [系统表hook](#系统表hook)
+    - [inline hook](#inline-hook)
+  - [3.隐藏](#3隐藏)
+    - [文件夹隐藏](#文件夹隐藏)
+      - [系统调用级别](#系统调用级别)
+- [参考](#参考)
+<!--toc:end-->
+
 基础rootkit的编写学习
 内核版本定为`linux-6.3.4`
-
 **需要注意，这里一切的内容仅仅用于学习Linux驱动编程的高级技巧，并且主要为了帮助读者来更好的防范这种攻击 ;)**
 
 
@@ -440,18 +455,78 @@ static size_t hook_king(void){
 ...
 ```
 
+## 3.隐藏
+这是rootkit最具特色的功能，首先实现文件目录的隐藏
+
+### 文件夹隐藏
+#### 系统调用级别
+首先查看平常的`ls`会调用哪些系统函数,可以简单的使用strace查看
+```sh
+openat(AT_FDCWD, ".", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3
+fstat(3, {st_mode=S_IFDIR|0755, st_size=4096, ...}) = 0
+getdents64(3, 0x5f5ba5cb2700 /* 18 entries */, 32768) = 528
+getdents64(3, 0x5f5ba5cb2700 /* 0 entries */, 32768) = 0
+close(3)                                = 0
+```
+
+因此我们可以直接hook掉这个getdents64系统调用,
+```c
+
+SYSCALL_DEFINE3(getdents64, unsigned int, fd,
+		struct linux_dirent64 __user *, dirent, unsigned int, count)
+{
+	struct fd f;
+	struct getdents_callback64 buf = {
+		.ctx.actor = filldir64,
+		.count = count,
+		.current_dir = dirent
+	};
+	int error;
+
+    ...
+
+```
+本来尝试直接获取 `struct linux_dirent64` 和 `count` 来对其进行操控，但发现syscall的参数传递并不是简单的 `rdi, rsi , ...` 
+在这里直接进行调试，发现每次调用`__x64_sys_getdents64`函数时其`rdi`指向的就是用户态目录字符串的指针
+所以这里我们可以直接在钩子函数获取用户传递的字符串然后判断其中是否包含某个特定字符串
+如果包含则修改其返回值为0即可
+
+```c
+/ $ ls /proc
+1              27             8              ioports        schedstat
+10             28             9              irq            scsi
+11             29             acpi           kallsyms       self
+12             3              buddyinfo      kcore          slabinfo
+13             30             bus            key-users      softirqs
+14             31             cgroups        keys           stat
+15             32             cmdline        kmsg           swaps
+16             33             consoles       kpagecount     sys
+17             34             cpuinfo        kpageflags     sysrq-trigger
+18             35             crypto         loadavg        sysvipc
+19             36             devices        locks          thread-self
+2              37             diskstats      meminfo        timer_list
+20             38             dma            misc           tty
+21             4              driver         modules        uptime
+22             46             execdomains    mounts         version
+23             48             filesystems    mtrr           vmallocinfo
+24             5              fs             net            vmstat
+25             6              interrupts     pagetypeinfo   zoneinfo
+26             7              iomem          partitions
+/ $ ./use
+/ $ ls /proc
+/ $ ls
+bin               lib               root              use
+dev               lib64             sbin              use_pipe
+etc               linuxrc           sys               usr
+flag              proc              sys_table_finder
+home              pwhkit.ko         test
+init              pwhrootkit.ko     tmp
+```
 
 
-
-
-
-
-
-
-
-
-
-
+> [!IMPORTANT]
+> 存在问题1: 这里获取的仅仅是相对目录，因此有很多制裁手段,需要查看getdents64相关代码，例如`iterator_dir`
+> 存在问题2: 仅仅在getdents64的hook并不全面,需要找到更加广泛适用的方案
 
 
 

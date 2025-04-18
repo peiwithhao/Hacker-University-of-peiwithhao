@@ -18,7 +18,7 @@ struct hook_context{
     struct pt_regs regs;
     void (* orig_func)(size_t, size_t, size_t, size_t, size_t, size_t);
     void (* hook_before)(struct pt_regs *);
-    void (* hook_after)(struct pt_regs *);
+    void (* hook_after)(struct pt_regs *, size_t *);
     struct list_head hook_list;
 };
 
