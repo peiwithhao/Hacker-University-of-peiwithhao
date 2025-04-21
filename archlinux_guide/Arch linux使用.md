@@ -202,7 +202,24 @@ NetworkManager默认会以明文的形式将密码存放在`/etc/NetworkManager/
 可通过下面的命令来查看密码
 `grep -r '^psk=' /etc/NetworkManager/system-connections/`
 
+## tcpdump
+查看L2网络的联通情况，可以使用该命令来对网桥接受信息进行捕获
+```sh
+sudo tcpdump -i <br-name> arp -vv
+```
 
+然后从另一节点ping
+
+
+查看arp记录信息
+```sh
+arp -n
+
+```
+消除arp缓存命令
+```sh
+sudo ip -s -s neigh flush all
+```
 
 
 
