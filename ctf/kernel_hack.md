@@ -173,6 +173,7 @@ ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0                  [vsysca
 
 
 [config释义](https://www.kernelconfig.io/index.html)
+[sysctl参数解析](https://sysctl-explorer.net/) 
 
 
 
