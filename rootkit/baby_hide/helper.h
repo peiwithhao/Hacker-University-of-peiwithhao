@@ -6,7 +6,11 @@
 #include <linux/list.h>
 
 #define CODE_BUFFER 0x100
-
+/* HOOK_MODE */
+enum HOOK_MODE{
+    HOOK_ONCE = 1 << 0,
+    HOOK_ETERNAL = 1 << 1
+};
 
 
 /* hook函数的上下文结构 */
@@ -36,9 +40,8 @@ extern struct list_head system_hook_list;
 size_t arbitrary_pte_write(void *dst, void *src, size_t size);
 void arbitrary_cr0_write(void *dst, void *src, size_t count);
 int arbitrary_remap_write(void *dst, void *src, size_t size);
-size_t do_hook(struct hook_context *);
 void sys_call_table_finder(void);
-ssize_t hookpoint_add(struct hook_context * hook_ctx, size_t orig_func, size_t hook_before, size_t hook_after);
+ssize_t hookpoint_add(struct hook_context * hook_ctx, size_t orig_func, size_t hook_before, size_t hook_after, unsigned int flags);
 ssize_t hookpoint_del_all(void);
 /* 注册hook点 */
 struct hook_context *hook_ctx_init(void);

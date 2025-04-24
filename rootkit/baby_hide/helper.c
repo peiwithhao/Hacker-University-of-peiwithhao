@@ -142,7 +142,8 @@ void sys_call_table_finder(void){
     get_syscall_data = 1;
 }
 
- size_t do_hook(struct hook_context *hook_ctx){
+/* 持久hook */
+static size_t do_hook(struct hook_context *hook_ctx){
      asm volatile(
          "movq %%rax, %0;"
          "movq %%rbx, %1;"
@@ -214,10 +215,84 @@ void sys_call_table_finder(void){
  }
 
 
+/* hook 单次 */
+ static size_t do_hook_once(struct hook_context *hook_ctx){
+     asm volatile(
+         "movq %%rax, %0;"
+         "movq %%rbx, %1;"
+         "movq %%rcx, %2;"
+         "movq %%rdx, %3;"
+         "movq %%rsi, %4;"
+         "movq %%r15, %5;"
+         "movq %%rbp, %6;"
+         "movq %%r8, %7;"
+         "movq %%r9, %8;"
+         "movq %%r10, %9;"
+         "movq %%r11, %10;"
+         "movq %%r12, %11;"
+         "movq %%r13, %12;"
+         "movq %%r14, %13;"
+         "movq %%r15, %14;"
+
+         : "=m"(hook_ctx->regs.ax),  "=m"(hook_ctx->regs.bx), 
+           "=m"(hook_ctx->regs.cx),  "=m"(hook_ctx->regs.dx), 
+           "=m"(hook_ctx->regs.si),  "=m"(hook_ctx->regs.di), 
+           "=m"(hook_ctx->regs.bp),  "=m"(hook_ctx->regs.r8), 
+           "=m"(hook_ctx->regs.r9),  "=m"(hook_ctx->regs.r10),
+           "=m"(hook_ctx->regs.r11), "=m"(hook_ctx->regs.r12),
+           "=m"(hook_ctx->regs.r13), "=m"(hook_ctx->regs.r14),
+           "=m"(hook_ctx->regs.r15)
+         :
+         : );
+     if(hook_ctx->hook_before){
+         hook_ctx->hook_before(&(hook_ctx->regs));
+     }
+     
+     arbitrary_remap_write((void *)hook_ctx->orig_func, hook_ctx->orig_code, hook_ctx->shellcode_nr);
+     
+     asm volatile(
+         "movq %1, %%rax;"
+         "movq %2, %%rbx;"
+         "movq %3, %%rcx;"
+         "movq %4, %%rdx;"
+         "movq %5, %%rsi;"
+         "movq %6, %%rdi;"
+         "movq %7, %%rbp;"
+         "movq %8, %%r8;"
+         "movq %9, %%r9;"
+         "movq %10, %%r10;"
+         "movq %11, %%r11;"
+         "movq %12, %%r12;"
+         "movq %13, %%r13;"
+         "movq %14, %%r14;"
+         "movq %15, %%r15;"
+         "call *%16;"
+         "movq %%rax, %0"
+         : "=m"(hook_ctx->ret)
+         : "m"(hook_ctx->regs.ax),  "m"(hook_ctx->regs.bx), 
+           "m"(hook_ctx->regs.cx),  "m"(hook_ctx->regs.dx), 
+           "m"(hook_ctx->regs.si),  "m"(hook_ctx->regs.di), 
+           "m"(hook_ctx->regs.bp),  "m"(hook_ctx->regs.r8), 
+           "m"(hook_ctx->regs.r9),  "m"(hook_ctx->regs.r10),
+           "m"(hook_ctx->regs.r11), "m"(hook_ctx->regs.r12),
+           "m"(hook_ctx->regs.r13), "m"(hook_ctx->regs.r14),
+           "m"(hook_ctx->regs.r15), "m"(hook_ctx->orig_func)
+         : 
+     );
+     if(hook_ctx->hook_after){
+         hook_ctx->hook_after(&(hook_ctx->regs), (size_t *)&(hook_ctx->ret));
+     }
+     
+     return hook_ctx->ret;
+ }
+
+
+
 
 
 /* 向函数添加hook */
-ssize_t hookpoint_add(struct hook_context *hook_ctx, size_t orig_func, size_t hook_before, size_t hook_after){
+/* 传递flags,单次或多次 */
+ssize_t hookpoint_add(struct hook_context *hook_ctx, size_t orig_func, size_t hook_before, size_t hook_after, unsigned int flags){
     size_t shellcode_nr;
     size_t index;
     size_t hook_ctl;
@@ -227,7 +302,11 @@ ssize_t hookpoint_add(struct hook_context *hook_ctx, size_t orig_func, size_t ho
     hook_ctx->hook_after = (void (*)(struct pt_regs *, size_t *))hook_after;
     hook_ctx->orig_func = (void (*)(size_t, size_t, size_t, size_t, size_t, size_t))orig_func;
 
-    hook_ctl = (size_t)do_hook;
+    if(flags & HOOK_ONCE){
+        hook_ctl = (size_t)do_hook_once;
+    }else{
+        hook_ctl = (size_t)do_hook;
+    }
     hook_ctx_ptr = (size_t)hook_ctx;
 
     // mov r15 rdi
