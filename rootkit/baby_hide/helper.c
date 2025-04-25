@@ -287,6 +287,86 @@ static size_t do_hook(struct hook_context *hook_ctx){
  }
 
 
+ static size_t do_hook_cover(struct hook_context *hook_ctx){
+     asm volatile(
+         "movq %%rax, %0;"
+         "movq %%rbx, %1;"
+         "movq %%rcx, %2;"
+         "movq %%rdx, %3;"
+         "movq %%rsi, %4;"
+         "movq %%r15, %5;"
+         "movq %%rbp, %6;"
+         "movq %%r8, %7;"
+         "movq %%r9, %8;"
+         "movq %%r10, %9;"
+         "movq %%r11, %10;"
+         "movq %%r12, %11;"
+         "movq %%r13, %12;"
+         "movq %%r14, %13;"
+         "movq %%r15, %14;"
+
+         : "=m"(hook_ctx->regs.ax),  "=m"(hook_ctx->regs.bx), 
+           "=m"(hook_ctx->regs.cx),  "=m"(hook_ctx->regs.dx), 
+           "=m"(hook_ctx->regs.si),  "=m"(hook_ctx->regs.di), 
+           "=m"(hook_ctx->regs.bp),  "=m"(hook_ctx->regs.r8), 
+           "=m"(hook_ctx->regs.r9),  "=m"(hook_ctx->regs.r10),
+           "=m"(hook_ctx->regs.r11), "=m"(hook_ctx->regs.r12),
+           "=m"(hook_ctx->regs.r13), "=m"(hook_ctx->regs.r14),
+           "=m"(hook_ctx->regs.r15)
+         :
+         : );
+     if(hook_ctx->hook_before){
+         hook_ctx->hook_before(&(hook_ctx->regs));
+     }
+    asm volatile(
+        "movq %%rax, %0;"
+        : "=m"(hook_ctx->ret)
+        :
+        :
+    );
+    return hook_ctx->ret;
+ }
+/* hook 单次 */
+ static size_t do_hook_cover_once(struct hook_context *hook_ctx){
+     asm volatile(
+         "movq %%rax, %0;"
+         "movq %%rbx, %1;"
+         "movq %%rcx, %2;"
+         "movq %%rdx, %3;"
+         "movq %%rsi, %4;"
+         "movq %%r15, %5;"
+         "movq %%rbp, %6;"
+         "movq %%r8, %7;"
+         "movq %%r9, %8;"
+         "movq %%r10, %9;"
+         "movq %%r11, %10;"
+         "movq %%r12, %11;"
+         "movq %%r13, %12;"
+         "movq %%r14, %13;"
+         "movq %%r15, %14;"
+
+         : "=m"(hook_ctx->regs.ax),  "=m"(hook_ctx->regs.bx), 
+           "=m"(hook_ctx->regs.cx),  "=m"(hook_ctx->regs.dx), 
+           "=m"(hook_ctx->regs.si),  "=m"(hook_ctx->regs.di), 
+           "=m"(hook_ctx->regs.bp),  "=m"(hook_ctx->regs.r8), 
+           "=m"(hook_ctx->regs.r9),  "=m"(hook_ctx->regs.r10),
+           "=m"(hook_ctx->regs.r11), "=m"(hook_ctx->regs.r12),
+           "=m"(hook_ctx->regs.r13), "=m"(hook_ctx->regs.r14),
+           "=m"(hook_ctx->regs.r15)
+         :
+         : );
+     if(hook_ctx->hook_before){
+         hook_ctx->hook_before(&(hook_ctx->regs));
+     }
+    asm volatile(
+        "movq %%rax, %0;"
+        : "=m"(hook_ctx->ret)
+        :
+        :
+    );
+    arbitrary_remap_write((void *)hook_ctx->orig_func, hook_ctx->orig_code, hook_ctx->shellcode_nr);
+    return hook_ctx->ret;
+ }
 
 
 
@@ -298,14 +378,20 @@ ssize_t hookpoint_add(struct hook_context *hook_ctx, size_t orig_func, size_t ho
     size_t hook_ctl;
     size_t hook_ctx_ptr;
     /* 保存hook函数 */
-    hook_ctx->hook_before = (void (*)(struct pt_regs *))hook_before;
-    hook_ctx->hook_after = (void (*)(struct pt_regs *, size_t *))hook_after;
-    hook_ctx->orig_func = (void (*)(size_t, size_t, size_t, size_t, size_t, size_t))orig_func;
+    hook_ctx->hook_before = (size_t (*)(struct pt_regs *))hook_before;
+    hook_ctx->hook_after = (size_t (*)(struct pt_regs *, size_t *))hook_after;
+    hook_ctx->orig_func = (size_t (*)(size_t, size_t, size_t, size_t, size_t, size_t))orig_func;
 
     if(flags & HOOK_ONCE){
         hook_ctl = (size_t)do_hook_once;
-    }else{
+    }else if(flags & HOOK_ETERNAL){
         hook_ctl = (size_t)do_hook;
+    }else if(flags & HOOK_COVER_ONCE){
+        hook_ctl = (size_t)do_hook_cover_once;
+    }else if(flags & HOOK_COVER_ETERNAL){
+        hook_ctl = (size_t)do_hook_cover;
+    }else {
+        return 1;
     }
     hook_ctx_ptr = (size_t)hook_ctx;
 

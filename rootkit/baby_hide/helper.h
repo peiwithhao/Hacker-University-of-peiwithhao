@@ -8,8 +8,10 @@
 #define CODE_BUFFER 0x100
 /* HOOK_MODE */
 enum HOOK_MODE{
-    HOOK_ONCE = 1 << 0,
-    HOOK_ETERNAL = 1 << 1
+    HOOK_ONCE          = 1 << 0,
+    HOOK_ETERNAL       = 1 << 1,
+    HOOK_COVER_ONCE    = 1 << 2,
+    HOOK_COVER_ETERNAL = 1 << 3
 };
 
 
@@ -20,9 +22,9 @@ struct hook_context{
     size_t shellcode_nr;
     size_t ret;
     struct pt_regs regs;
-    void (* orig_func)(size_t, size_t, size_t, size_t, size_t, size_t);
-    void (* hook_before)(struct pt_regs *);
-    void (* hook_after)(struct pt_regs *, size_t *);
+    size_t (* orig_func)(size_t, size_t, size_t, size_t, size_t, size_t);
+    size_t (* hook_before)(struct pt_regs *);
+    size_t (* hook_after)(struct pt_regs *, size_t *);
     struct list_head hook_list;
 };
 
