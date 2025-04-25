@@ -132,7 +132,7 @@ sudo systemctl restart chrony && sudo systemctl enable chrony
 
 在计算节点
 ```sh
-sudo apt instal chrony
+sudo apt install chrony
 echo "server 192.168.122.10" >> /etc/chrony/chrony.conf
 sudo systemctl restart chrony && sudo systemctl enable chrony
 sudo chronyc sources     # 查看支持的ntp服务器
@@ -142,7 +142,7 @@ sudo chronyc sources     # 查看支持的ntp服务器
 在存储节点
 
 ```sh
-sudo apt instal chrony
+sudo apt install chrony
 echo "server 192.168.122.10" >> /etc/chrony/chrony.conf
 sudo systemctl restart chrony && sudo systemctl enable chrony
 sudo chronyc sources     # 查看支持的ntp服务器
@@ -918,6 +918,15 @@ $ openstack stack list
 +--------------------------------------+------------+----------------------------------+-----------------+----------------------+--------------+
 
 ```
+
+## 坑
+1. 创建server过后发现openstack分配的IP和虚拟机内部的IP不一致,而且虚拟机内部无法ping通网关，
+但是将虚拟机的内部IP修改为openstack所分配的IP后却可以进行正常通信
+这就导致了一个问题：
+    1. ubuntu cloud image 默认只有ssh登陆，但现在的情况是无法与虚拟机进行正常的通信，
+    而需要正常的通信则需要登陆进去修改静态IP
+
+
 # 参考
 [https://ubuntu.com/tutorials/install-openstack-on-your-workstation-and-launch-your-first-instance#2-install-openstack](https://ubuntu.com/tutorials/install-openstack-on-your-workstation-and-launch-your-first-instance#2-install-openstack)
 [https://canonical.com/microstack/docs/single-node](https://canonical.com/microstack/docs/single-node)
