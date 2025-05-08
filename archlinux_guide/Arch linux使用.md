@@ -133,6 +133,8 @@ pacman -Fl pacakge_name 	//查看远程库软件包包含的文件
 pacman -Qk pacakge_name 	//查看软件包安装的文件是否都存在
 pacman -Qdt 				//罗列所有孤立包
 pacman -Qo filename         //查看该文件属于哪个包
+pacman -Q | wc -l           //查看所有下载包的数量
+pacman -Qent | wc -l        //查看主动下载的包数量(不包含依赖下载)
 ```
 
 清理包缓存
@@ -467,7 +469,9 @@ find <dir_path> -printf '<format>' 		//设置输出格式
 
 ```
 awk '{print $1}' 		//打印输入信息的第一列
+awk -F','  '{print $1}'  //按照指定的分隔符来打印列
 ```
+
 
 
 
@@ -773,7 +777,7 @@ $ source bin/activate
 $ deactivate
 ```
 
-# 0x11.屏幕录制/截取
+# 0x11.屏幕录制/截取/相机
 推荐使用wf-recorder
 ```shell
 $ wf-recorder --audio -o file_name -g "$(slurp)"
@@ -789,6 +793,13 @@ $ wf-recorder --audio -o file_name -g "$(slurp)"
 	名称：alsa_input.pci-0000_00_1f.3-platform-skl_hda_dsp_generic.HiFi__Mic2__source
 	名称：alsa_input.pci-0000_00_1f.3-platform-skl_hda_dsp_generic.HiFi__Mic1__source
 	名称：bluez_sink.CC_14_BC_B5_89_61.a2dp_sink.monitor
+```
+
+
+这里我们也可以使用mpv来进行系统摄像头的调用
+```c
+mpv --profile=low-latency --untimed /dev/video0
+
 ```
 
 # 0x12 渗透相关
@@ -897,4 +908,6 @@ neofetch
 fastfetch
 ```
 
+# 0x1B 启动选项
+修改efi启动选项列表，使用`efibootmgr`
 
