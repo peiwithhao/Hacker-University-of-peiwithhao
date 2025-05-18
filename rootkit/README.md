@@ -595,6 +595,100 @@ static void iterate_dir_before_hooker(struct pt_regs *regs){
 ![arbitrary_file_hide](./img/arbitrary_file_hide.png) 
 
 
+###  3.3 模块的隐藏
+在使用`insmod`加入模块的时候，实际上会调用`init_module`系统调用，
+而这个系统会加载我们的ko文件然后将ko文件载入内核的模块地址区域,
+同时将这个过程中创建的`struct module`连接到全局链表`LIST_HEAD(modules);`中
+除此之外，linux为用户提供了`lsmod`等命令来获取内核模块的信息
+lsmod在strace的跟踪过程中
+```text
+
+[ 257] openat(AT_FDCWD, "/proc/modules", O_RDONLY|O_CLOEXEC) = 3
+[   5] fstat(3, {st_mode=S_IFREG|0444, st_size=0, ...}) = 0
+[   0] read(3, "exfat 114688 0 - Live 0x00000000"..., 1024) = 1024
+[   0] read(3, "ck_tftp 20480 3 nf_nat_tftp, Liv"..., 1024) = 1024
+[   0] read(3, " nf_conntrack, Live 0x0000000000"..., 1024) = 1024
+[   0] read(3, ",garp,stp, Live 0x00000000000000"..., 1024) = 1024
+[   0] read(3, "hda_dsp 16384 4 - Live 0x0000000"..., 1024) = 1024
+[   0] read(3, "00 3 snd_sof_pci_intel_tgl,snd_s"..., 1024) = 1024
+[   0] read(3, "6 snd_sof_probes,snd_sof_pci_int"..., 1024) = 1024
+[   0] read(3, "nd_soc_hda_codec 28672 1 snd_soc"..., 1024) = 1024
+[   0] read(3, "0\nsnd_hda_intel 69632 1 - Live 0"..., 1024) = 1024
+[   0] read(3, "on,snd_hda_codec_realtek,snd_hda"..., 1024) = 1024
+[   0] read(3, "0x0000000000000000\nsnd_pcm 20070"..., 1024) = 1024
+[   0] read(3, "p_wmi, Live 0x0000000000000000\nm"..., 1024) = 1024
+[   0] read(3, "_hid_acpi, Live 0x00000000000000"..., 1024) = 1024
+[   0] read(3, "EJECT,xt_tcpudp,nft_compat,ip_ta"..., 1024) = 1024
+[   0] read(3, "0000\nttm 106496 3 xe,i915,drm_tt"..., 1024) = 471
+```
+
+发现其也会打开`/proc/modules`文件进行读取
+而这个文件在proc伪文件系统的注册过程如下：
+
+```c
+
+static const struct proc_ops modules_proc_ops = {
+	.proc_flags	= PROC_ENTRY_PERMANENT,
+	.proc_open	= modules_open,
+	.proc_read	= seq_read,
+	.proc_lseek	= seq_lseek,
+	.proc_release	= seq_release,
+};
+
+static int __init proc_modules_init(void)
+{
+	proc_create("modules", 0, NULL, &modules_proc_ops);
+	return 0;
+}
+```
+从`modules_proc_ops`可以看到该文件的读取采用了`seq_*`的方法,因此在打开这个文件的时候代码如下
+
+```c
+
+
+/* Called by the /proc file system to return a list of modules. */
+static void *m_start(struct seq_file *m, loff_t *pos)
+{
+	mutex_lock(&module_mutex);
+	return seq_list_start(&modules, *pos);
+}
+/*
+ * Format: modulename size refcount deps address
+ *
+ * Where refcount is a number or -, and deps is a comma-separated list
+ * of depends or -.
+ */
+static const struct seq_operations modules_op = {
+	.start	= m_start,
+	.next	= m_next,
+	.stop	= m_stop,
+	.show	= m_show
+};
+
+/*
+ * This also sets the "private" pointer to non-NULL if the
+ * kernel pointers should be hidden (so you can just test
+ * "m->private" to see if you should keep the values private).
+ *
+ * We use the same logic as for /proc/kallsyms.
+ */
+static int modules_open(struct inode *inode, struct file *file)
+{
+	int err = seq_open(file, &modules_op);
+
+	if (!err) {
+		struct seq_file *m = file->private_data;
+
+		m->private = kallsyms_show_value(file->f_cred) ? NULL : (void *)8ul;
+	}
+
+	return err;
+}
+```
+
+上述代码可以大致看出这里是遍历的`modules`全局模块链表
+
+所以这里我们可以直接脱链表来完成隐藏
 
 # 参考
 [https://xz.aliyun.com/t/12439?time__1311=GqGxRQ0%3Dq7qxlxx2mDu0maqY5okqWwnwmD#toc-3](https://xz.aliyun.com/t/12439?time__1311=GqGxRQ0%3Dq7qxlxx2mDu0maqY5okqWwnwmD#toc-3)

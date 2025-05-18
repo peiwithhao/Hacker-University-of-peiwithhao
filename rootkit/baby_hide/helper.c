@@ -172,7 +172,14 @@ static size_t do_hook(struct hook_context *hook_ctx){
          :
          : );
      if(hook_ctx->hook_before){
-         hook_ctx->hook_before(&(hook_ctx->regs));
+        hook_ctx->hook_before(&(hook_ctx->regs));
+        asm volatile(
+            "movq %%rax, %0;"
+            : "=m"(hook_ctx->ret)
+            :
+            :
+        );
+        if(hook_ctx->ret) goto pass_process;
      }
      
      arbitrary_remap_write((void *)hook_ctx->orig_func, hook_ctx->orig_code, hook_ctx->shellcode_nr);
@@ -209,9 +216,13 @@ static size_t do_hook(struct hook_context *hook_ctx){
      if(hook_ctx->hook_after){
          hook_ctx->hook_after(&(hook_ctx->regs), (size_t *)&(hook_ctx->ret));
      }
-     
+
+/* 用来触发函数跳过功能 */
+pass_process:
      arbitrary_remap_write((void *)hook_ctx->orig_func, hook_ctx->hook_code, hook_ctx->shellcode_nr);
+     hook_ctx->hitcount++;
      return hook_ctx->ret;
+
  }
 
 
@@ -245,7 +256,14 @@ static size_t do_hook(struct hook_context *hook_ctx){
          :
          : );
      if(hook_ctx->hook_before){
-         hook_ctx->hook_before(&(hook_ctx->regs));
+        hook_ctx->hook_before(&(hook_ctx->regs));
+        asm volatile(
+            "movq %%rax, %0;"
+            : "=m"(hook_ctx->ret)
+            :
+            :
+        );
+        if(hook_ctx->ret) goto pass_process;
      }
      
      arbitrary_remap_write((void *)hook_ctx->orig_func, hook_ctx->orig_code, hook_ctx->shellcode_nr);
@@ -283,6 +301,8 @@ static size_t do_hook(struct hook_context *hook_ctx){
          hook_ctx->hook_after(&(hook_ctx->regs), (size_t *)&(hook_ctx->ret));
      }
      
+pass_process:
+     hook_ctx->hitcount++;
      return hook_ctx->ret;
  }
 
@@ -318,12 +338,15 @@ static size_t do_hook(struct hook_context *hook_ctx){
      if(hook_ctx->hook_before){
          hook_ctx->hook_before(&(hook_ctx->regs));
      }
+
     asm volatile(
         "movq %%rax, %0;"
         : "=m"(hook_ctx->ret)
         :
         :
     );
+
+    hook_ctx->hitcount++;
     return hook_ctx->ret;
  }
 /* hook 单次 */
@@ -364,6 +387,8 @@ static size_t do_hook(struct hook_context *hook_ctx){
         :
         :
     );
+
+     hook_ctx->hitcount++;
     arbitrary_remap_write((void *)hook_ctx->orig_func, hook_ctx->orig_code, hook_ctx->shellcode_nr);
     return hook_ctx->ret;
  }
@@ -450,6 +475,8 @@ ssize_t hookpoint_del_all(void){
 
 struct hook_context *hook_ctx_init(void){
     struct hook_context *hook_ctx = kmalloc(sizeof(struct hook_context), GFP_KERNEL);
+    hook_ctx->hitcount = 0;
+    memset(hook_ctx, '\x00', sizeof(struct hook_context));
     return hook_ctx;
 }
 

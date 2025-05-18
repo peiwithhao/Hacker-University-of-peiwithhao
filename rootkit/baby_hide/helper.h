@@ -26,6 +26,7 @@ struct hook_context{
     size_t (* hook_before)(struct pt_regs *);
     size_t (* hook_after)(struct pt_regs *, size_t *);
     struct list_head hook_list;
+    size_t hitcount;   //击中次数
 };
 
 

