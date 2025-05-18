@@ -690,6 +690,10 @@ static int modules_open(struct inode *inode, struct file *file)
 
 所以这里我们可以直接脱链表来完成隐藏
 
+将模块脱链后除了可以隐藏模块外还可以隐藏用户打印`/proc/kallsyms`文件时的打印,如下
+
+![module_hidden](./img/module_hidden.png) 
+
 # 参考
 [https://xz.aliyun.com/t/12439?time__1311=GqGxRQ0%3Dq7qxlxx2mDu0maqY5okqWwnwmD#toc-3](https://xz.aliyun.com/t/12439?time__1311=GqGxRQ0%3Dq7qxlxx2mDu0maqY5okqWwnwmD#toc-3)
 [分页](https://zolutal.github.io/understanding-paging/)

