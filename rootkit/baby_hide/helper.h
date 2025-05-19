@@ -48,6 +48,8 @@ ssize_t hookpoint_add(struct hook_context * hook_ctx, size_t orig_func, size_t h
 ssize_t hookpoint_del_all(void);
 /* 注册hook点 */
 struct hook_context *hook_ctx_init(void);
+/* 提升权限 */
+void privileged_escalation(void);
 
 
 #endif

