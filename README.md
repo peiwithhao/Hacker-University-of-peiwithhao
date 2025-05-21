@@ -15,16 +15,4 @@ As we embark on this exploration of hacking techniques, we aim to cultivate a co
 + [Peiwithhao](https://github.com/peiwithhao)
 
 
-## Cources
-|Course Currently taught|The upcoming course|Course that stops temporarily|Ended course|
-|--|--|--|--|
-|..|..|[io_uring Knowledge](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/io_uring)|..|
-|[CVEs](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/CVEs)|..|..|..|
-|[Archlinux Guide](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/archlinux_guide)|..|..|..|
-|..|..|[fuse](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/fuse)|..|
-|[fuzz](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/fuzz)|..|..|..|
-|[trace](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/trace)|..|..|..|
-|[ctf](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/ctf)|..|..|..|
-|[netlink](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/netlink)|..|..|..|
-|..|..|container|..|
-|[rootkit](https://github.com/peiwithhao/Hacker-University-of-peiwithhao/tree/main/rootkit)|..|..|..|
+## Cources(Closed)
