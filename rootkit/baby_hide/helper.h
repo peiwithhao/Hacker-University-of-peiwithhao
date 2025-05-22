@@ -17,22 +17,25 @@ enum HOOK_MODE{
 
 /* hook函数的上下文结构 */
 struct hook_context{
-    u8 orig_code[CODE_BUFFER];
-    u8 hook_code[CODE_BUFFER];
-    size_t shellcode_nr;
-    size_t ret;
-    struct pt_regs regs;
+    u8 orig_code[CODE_BUFFER]; //被hook函数代码，用来进行还原
+    u8 hook_code[CODE_BUFFER]; //hook函数代码
+    size_t shellcode_nr; 
+    size_t ret;     //存放返回值
+    struct pt_regs regs;    //存放hook时的regs
     size_t (* orig_func)(size_t, size_t, size_t, size_t, size_t, size_t);
     size_t (* hook_before)(struct pt_regs *);
     size_t (* hook_after)(struct pt_regs *, size_t *);
-    struct list_head hook_list;
+    struct list_head hook_list;     //所有hook链接在一起
     size_t hitcount;   //击中次数
+    enum HOOK_MODE mode; //表示hook模式
 };
 
 
 extern size_t syscall_table_data[5];
 extern size_t get_syscall_data;
 extern size_t syscall_table_addr;
+
+/* 全局hook列表 */
 extern struct list_head system_hook_list;
 
 

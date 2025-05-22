@@ -1,1 +1,12 @@
-.cache/
+*
+!helper.c
+!helper.h
+!hidden.c
+!hidden.h
+!pwhrootkit.h
+!pwhrootkit.c
+!Makefile
+!rootkitopts.c
+!rootkitopts.h
+
+

