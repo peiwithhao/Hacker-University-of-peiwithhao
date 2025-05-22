@@ -168,7 +168,7 @@ const struct super_operations kernfs_sops = {
 ```
 在这之后`do_new_mount`将会调用`do_new_mount_fc()`函数来创建挂载点然后进行链接
 
-# 3. kobject
+# 3.kobject
 在挂载的过程当中似乎每看到kobject,但是他确实是实现`/sys`文件系统的重要组成部分
 ```c
 struct kobject {
@@ -250,6 +250,8 @@ struct kobj_type {
 其中存在`sysfs_ops`的操作属性文件的函数，这些函数会从`default_attrs`中取出属性文件对应的attribute,
 由此才能找到对应该`attribute`所属于的`kobj_attribute`,从而取出属性操作函数
 
+> [!NOTE]
+> 在加载模块的时候会调用`load_module`会创建对应module的kobj
 
 
 # 引用

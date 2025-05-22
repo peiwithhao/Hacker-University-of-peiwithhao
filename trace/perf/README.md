@@ -107,3 +107,23 @@ pidstat -d 1
 用于linux的性能分析工具
 通常会使用`perf record`来进行分析生成perf文件
 然后使用`perf report`来查看该perf文件
+
+## perf top
+用来监控整体数据
+
+
+## perf stat
+适合查看单个程序的执行情况
+```sh
+perf stat ls -lf
+```
+## perf record
+记录程序运行的详细情况，然后在当前目录生成perf.data文件
+
+`perf record -a -g ./test`
+
+## perf report
+打印perf.data
+`perf report --call-graph none`
+
+
