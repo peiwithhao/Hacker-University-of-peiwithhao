@@ -1,3 +1,17 @@
+<!--toc:start-->
+- [内存管理浅析](#内存管理浅析)
+- [节点node:struct pglist_data(别名pg_data_t)](#节点nodestruct-pglistdata别名pgdatat)
+- [区域zone: struct zone](#区域zone-struct-zone)
+  - [水位线](#水位线)
+  - [页面](#页面)
+  - [伙伴系统(buddy system)](#伙伴系统buddy-system)
+- [页帧page](#页帧page)
+- [页内存管理](#页内存管理)
+  - [伙伴系统](#伙伴系统)
+  - [页级分配API](#页级分配api)
+    - [alloc_pages](#allocpages)
+<!--toc:end-->
+
 # 内存管理浅析
 在很久以前的博客曾经写过slab分配，伙伴系统的分析，这里用来进行加强细节的认识和巩固知识
 本次基于的内核是`linux-6.3.4`
@@ -66,6 +80,14 @@ struct per_cpu_pages {
 } ____cacheline_aligned_in_smp;
 ```
 
+
+> [!NOTE]
+> 每个CPU拥有一个`per_cpu_pageset`所表示的结构体`struct per_cpu_pages`
+> 该结构体下拥有每个CPU的列表，用于防止多个CPU同时访问buddysystem而造成性能瓶颈
+
+
+
+这里的`pcp-lists`
 
 ## 伙伴系统(buddy system)
 用于实现伙伴系统，总共有11个order
@@ -141,28 +163,100 @@ static int fallbacks[MIGRATE_TYPES][MIGRATE_PCPTYPES - 1] = {
 ### alloc_pages
 
 
-
-
-        alloc_pages
-            │
-            ▼
-        alloc_pages_node ──────────►__alloc_pages_node
-                                           │
-                                           ▼
-                                    __alloc_pages
-                                           ┃
-                    ┎──────────────────────┶━━━━━━━━━┐
-                    ▼                                ▼
-           prepare_alloc_pages             get_page_from_freelist
-            获取zonelist信息                        分配新页面   
-                                                      │
-                                                      ▼
-                                                    rmqueue 
-                                                    从buddysystem脱链
-
-
+        ┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
+        │                                                                                                     │
+        │   alloc_pages                                                 alloc_pages_node                      │
+        │       │                                                               │                             │
+        │       ▼                                                               ▼                             │
+        │   alloc_pages_node ──────────►__alloc_pages_node            __alloc_pages_node                      │
+        │                                      │                                │                             │
+        │                                      ▼                                │                             │
+        │                               __alloc_pages ◄─────────────────────────┘                             │
+        │                                      │                                                              │
+        │               ┌──────────────────────┴─────────┬───────────────────────────────────┐                │
+        │               ▼                                ▼                                   ▼                │
+        │      prepare_alloc_pages             get_page_from_freelist                 alloc_pages_slowpath    │  
+        │       获取zonelist信息                      分配新页面                        回收页面减轻压力      │
+        │                                                 │                                分配新页面         │
+        │                                                 ▼                                                   │
+        │                                               rmqueue                                               │
+        │                                                 │                                                   │
+        │                                   ┌─────────────┴──────────────┐                                    │
+        │                                   │                            │                                    │
+        │                                   ▼                            ▼                                    │
+        │                           rmqueue_pcplist             rmqueue_buddysystem                           │
+        │                           1. 从pcp list分配              2. 从全局伙伴系统分配                      │
+        └─────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 上图就是其中分配页面的大概调用情况
+
+
+### free_pages
+
+        ┌──────────────────────────────────────────────────────────────────────────────┐
+        │      free_pages                                                              │
+        │          │                                                                   │
+        │          ▼                                                                   │
+        │     __free_pages──────────►free_the_page                                     │
+        │                                │                                             │
+        │                             ┌──┴──────────────────────────┐                  │
+        │                             ▼                             ▼                  │
+        │                   1. free_unref_page               2. __free_pages_ok        │
+        │                       释放pcp page                        │                  │
+        │                                                           │                  │
+        │                                                           ▼                  │
+        │                                                      __free_one_page         │
+        │                                                        释放到buddysysstem    │
+        │                                                               │              │
+        │                                  find_buddy_page_pfn◄─────────┘              │
+        │                                   寻找页面伙伴然后合并                       │
+        └──────────────────────────────────────────────────────────────────────────────┘
+
+
+## 不连续页的分配
+内核使用vmalloc来分配不连续区域，分配的虚拟内存在`vmalloc/ioremap`区域
+使用vmalloc的最常见的例子就是内核对于模块的实现
+
+内核使用`struct vmstruct`来管理内存中的vmalloc区域,每个使用vmalloc分配的区域都需要有这样一个结构体来管理
+
+### 分配API vmalloc
+
+         ┌───────────────────────────────────────────────────────────────────────────────────────────────────────┐
+         │                                                                                                       │
+         │      vmalloc────────►__vmalloc_node────────►__vmalloc_node_range                                      │
+         │                                                  │                                                    │
+         │              ┌───────────────────────────────────┴────┐                                               │
+         │              ▼                                        ▼                                               │
+         │     1. __get_vm_area_node                        2. __vmalloc_area_node                               │
+         │      分配vm_struct                         分配物理页然后映射到vmalloc_base                           │
+         │              │                                        │                                               │
+         │              ├──────────────────────────┐             └──────────────────┐                            │
+         │              ▼                          ▼                                ▼                            │
+         │     1. alloc_vmap_area             2. setup_vmalloc_vm              vmap_pages_range                  │
+         │  计算合适的分配虚拟地址空间        补全vm_struct                   将分配到的pages映射到vmalloc区域   │
+         │                                                                                                       │
+         └───────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+### vfree
+
+        ┌────────────────────────────────────────────────┐
+        │           vfree                                │
+        │             │                                  │
+        │             │                                  │
+        │             ▼                                  │
+        │      remove_vm_area                            │
+        │   寻找并且释放掉vmalloc分配的连续虚拟地址空间  │
+        │                                                │
+        └────────────────────────────────────────────────┘
+
+
+
+
+
+
+
+
 
 
 
