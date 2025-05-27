@@ -163,54 +163,54 @@ static int fallbacks[MIGRATE_TYPES][MIGRATE_PCPTYPES - 1] = {
 ### alloc_pages
 
 
-        ┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
-        │                                                                                                     │
-        │   alloc_pages                                                 alloc_pages_node                      │
-        │       │                                                               │                             │
-        │       ▼                                                               ▼                             │
-        │   alloc_pages_node ──────────►__alloc_pages_node            __alloc_pages_node                      │
-        │                                      │                                │                             │
-        │                                      ▼                                │                             │
-        │                               __alloc_pages ◄─────────────────────────┘                             │
-        │                                      │                                                              │
-        │               ┌──────────────────────┴─────────┬───────────────────────────────────┐                │
-        │               ▼                                ▼                                   ▼                │
-        │      prepare_alloc_pages             get_page_from_freelist                 alloc_pages_slowpath    │  
-        │       获取zonelist信息                      分配新页面                        回收页面减轻压力      │
-        │                                                 │                                分配新页面         │
-        │                                                 ▼                                                   │
-        │                                               rmqueue                                               │
-        │                                                 │                                                   │
-        │                                   ┌─────────────┴──────────────┐                                    │
-        │                                   │                            │                                    │
-        │                                   ▼                            ▼                                    │
-        │                           rmqueue_pcplist             rmqueue_buddysystem                           │
-        │                           1. 从pcp list分配              2. 从全局伙伴系统分配                      │
-        └─────────────────────────────────────────────────────────────────────────────────────────────────────┘
+            ┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
+            │                                                                                                     │
+            │   alloc_pages                                                 alloc_pages_node                      │
+            │       │                                                               │                             │
+            │       ▼                                                               ▼                             │
+            │   alloc_pages_node ──────────►__alloc_pages_node            __alloc_pages_node                      │
+            │                                      │                                │                             │
+            │                                      ▼                                │                             │
+            │                               __alloc_pages ◄─────────────────────────┘                             │
+            │                                      │                                                              │
+            │               ┌──────────────────────┴─────────┬───────────────────────────────────┐                │
+            │               ▼                                ▼                                   ▼                │
+            │      prepare_alloc_pages             get_page_from_freelist                 alloc_pages_slowpath    │  
+            │       获取zonelist信息                      分配新页面                        回收页面减轻压力      │
+            │                                                 │                                分配新页面         │
+            │                                                 ▼                                                   │
+            │                                               rmqueue                                               │
+            │                                                 │                                                   │
+            │                                   ┌─────────────┴──────────────┐                                    │
+            │                                   │                            │                                    │
+            │                                   ▼                            ▼                                    │
+            │                           rmqueue_pcplist             rmqueue_buddysystem                           │
+            │                           1. 从pcp list分配              2. 从全局伙伴系统分配                      │
+            └─────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 上图就是其中分配页面的大概调用情况
 
 
 ### free_pages
 
-        ┌──────────────────────────────────────────────────────────────────────────────┐
-        │      free_pages                                                              │
-        │          │                                                                   │
-        │          ▼                                                                   │
-        │     __free_pages──────────►free_the_page                                     │
-        │                                │                                             │
-        │                             ┌──┴──────────────────────────┐                  │
-        │                             ▼                             ▼                  │
-        │                   1. free_unref_page               2. __free_pages_ok        │
-        │                       释放pcp page                        │                  │
-        │                                                           │                  │
-        │                                                           ▼                  │
-        │                                                      __free_one_page         │
-        │                                                        释放到buddysysstem    │
-        │                                                               │              │
-        │                                  find_buddy_page_pfn◄─────────┘              │
-        │                                   寻找页面伙伴然后合并                       │
-        └──────────────────────────────────────────────────────────────────────────────┘
+            ┌──────────────────────────────────────────────────────────────────────────────┐
+            │      free_pages                                                              │
+            │          │                                                                   │
+            │          ▼                                                                   │
+            │     __free_pages──────────►free_the_page                                     │
+            │                                │                                             │
+            │                             ┌──┴──────────────────────────┐                  │
+            │                             ▼                             ▼                  │
+            │                   1. free_unref_page               2. __free_pages_ok        │
+            │                       释放pcp page                        │                  │
+            │                                                           │                  │
+            │                                                           ▼                  │
+            │                                                      __free_one_page         │
+            │                                                        释放到buddysysstem    │
+            │                                                               │              │
+            │                                  find_buddy_page_pfn◄─────────┘              │
+            │                                   寻找页面伙伴然后合并                       │
+            └──────────────────────────────────────────────────────────────────────────────┘
 
 
 ## 不连续页的分配
@@ -221,41 +221,105 @@ static int fallbacks[MIGRATE_TYPES][MIGRATE_PCPTYPES - 1] = {
 
 ### 分配API vmalloc
 
-         ┌───────────────────────────────────────────────────────────────────────────────────────────────────────┐
-         │                                                                                                       │
-         │      vmalloc────────►__vmalloc_node────────►__vmalloc_node_range                                      │
-         │                                                  │                                                    │
-         │              ┌───────────────────────────────────┴────┐                                               │
-         │              ▼                                        ▼                                               │
-         │     1. __get_vm_area_node                        2. __vmalloc_area_node                               │
-         │      分配vm_struct                         分配物理页然后映射到vmalloc_base                           │
-         │              │                                        │                                               │
-         │              ├──────────────────────────┐             └──────────────────┐                            │
-         │              ▼                          ▼                                ▼                            │
-         │     1. alloc_vmap_area             2. setup_vmalloc_vm              vmap_pages_range                  │
-         │  计算合适的分配虚拟地址空间        补全vm_struct                   将分配到的pages映射到vmalloc区域   │
-         │                                                                                                       │
-         └───────────────────────────────────────────────────────────────────────────────────────────────────────┘
+            ┌───────────────────────────────────────────────────────────────────────────────────────────────────────┐
+            │                                                                                                       │
+            │      vmalloc────────►__vmalloc_node────────►__vmalloc_node_range                                      │
+            │                                                  │                                                    │
+            │              ┌───────────────────────────────────┴────┐                                               │
+            │              ▼                                        ▼                                               │
+            │     1. __get_vm_area_node                        2. __vmalloc_area_node                               │
+            │      分配vm_struct                         分配物理页然后映射到vmalloc_base                           │
+            │              │                                        │                                               │
+            │              ├──────────────────────────┐             └──────────────────┐                            │
+            │              ▼                          ▼                                ▼                            │
+            │     1. alloc_vmap_area             2. setup_vmalloc_vm              vmap_pages_range                  │
+            │  计算合适的分配虚拟地址空间        补全vm_struct                   将分配到的pages映射到vmalloc区域   │
+            │                                                                                                       │
+            └───────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
 
 ### vfree
 
-        ┌────────────────────────────────────────────────┐
-        │           vfree                                │
-        │             │                                  │
-        │             │                                  │
-        │             ▼                                  │
-        │      remove_vm_area                            │
-        │   寻找并且释放掉vmalloc分配的连续虚拟地址空间  │
-        │                                                │
-        └────────────────────────────────────────────────┘
+            ┌────────────────────────────────────────────────┐
+            │           vfree                                │
+            │             │                                  │
+            │             │                                  │
+            │             ▼                                  │
+            │      remove_vm_area                            │
+            │   寻找并且释放掉vmalloc分配的连续虚拟地址空间  │
+            │                                                │
+            └────────────────────────────────────────────────┘
 
 
 
+# 块内存管理
+主要是用于细粒度的分配，而不是以页为单位
+这里主要讲解的是slub分配器
+## kmalloc
+
+                         如果分配大小大于8k
+               kmalloc ─────────────►  kmalloc_large
+                  │ 小于8k
+                  ▼
+              __kmalloc_ ─────► __do_kmalloc_node
+                                      │
+                     ┌────────────────┴────────────────────────┐
+                     ▼                                         ▼
+               1. kmalloc_slab                  2. __kmem_cache_alloc_node ───► slab_alloc_node
+              到全局的kmalloc_caches中                                                │
+             寻找到合适的kmem_cache                                                   │
+                                                   __slab_alloc_node ◄────────────────┘
+                         慢路径                    尝试直接从per-cpu cache                                  
+                    ┌──────────────────────────────上的freelist直接获取object
+                    │                              否则尝试慢路径
+                    │
+                    ▼     wrapper
+             __slab_alloc────────►___slab_alloc
 
 
 
+### 慢路径 ___slab_alloc
 
+
+                ┌────────────────────────────────___slab_alloc
+                │   1. 如果per-cpu cache slab为空         │
+                │                                         │
+                ▼                                    slab不为空
+        ┌──────tag:new_slab ◄───如果freelist为空─┐        │           ┌────────────► tag:load_freelist
+        │          │                             │        │           │                 desc:get object
+        │          │                             │        │      freelist not empty
+        │   如果kmem_cache_cpu->partial还存在    │        ▼           │
+        │          │                             │   tag:rego         │
+        │          ▼                             │        │           │
+        │   将partial链表移到slab链表            └────────┴───────────┘
+        │          
+    if partial empty       
+        │
+        └────────► new_objects───────► new_slab───────► alloc_slab_pages
+                cpu preempt enable                           伙伴系统分配页面
+                alloc new slab from buddy system
+                cpu preempt disable
+                fill the per_cpu cache->**
+                
+
+
+##  kfree
+用来释放分配到的object
+
+                          ┌─────────kfree
+                          │
+                          ▼
+                 __kmem_cache_free──────────► slab_free
+                                                 │
+                 do_slab_free ◄──────────────────┘
+                       │
+                       ├─────slab !=c->slab────┐
+                       │                       │
+                slab == c->slab                ▼
+                       │                   'slow_path'
+                       ▼                   __slab_free
+                 'fast_path'
+            Just throw it to the freelist
 
 
 
