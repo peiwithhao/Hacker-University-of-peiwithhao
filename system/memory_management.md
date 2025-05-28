@@ -285,17 +285,17 @@ static int fallbacks[MIGRATE_TYPES][MIGRATE_PCPTYPES - 1] = {
                 │   1. 如果per-cpu cache slab为空         │
                 │                                         │
                 ▼                                    slab不为空
-        ┌──────tag:new_slab ◄───如果freelist为空─┐        │           ┌────────────► tag:load_freelist
+        ┌──────tag:new_slab ◄──if freelist empty─┐        │           ┌────────────► tag:load_freelist
         │          │                             │        │           │                 desc:get object
         │          │                             │        │      freelist not empty
         │   如果kmem_cache_cpu->partial还存在    │        ▼           │
-        │          │                             │   tag:rego         │
+        │          │                             │   tag:redo         │
         │          ▼                             │        │           │
         │   将partial链表移到slab链表            └────────┴───────────┘
         │          
-    if partial empty       
-        │
-        └────────► new_objects───────► new_slab───────► alloc_slab_pages
+    if partial empty                   ┌──►1. get_partial get partial from kmem_cache_node
+        │                              │
+        └────────► tag:new_objects─────┴─► 2. new_slab───────► alloc_slab_pages
                 cpu preempt enable                           伙伴系统分配页面
                 alloc new slab from buddy system
                 cpu preempt disable
@@ -320,6 +320,67 @@ static int fallbacks[MIGRATE_TYPES][MIGRATE_PCPTYPES - 1] = {
                        ▼                   __slab_free
                  'fast_path'
             Just throw it to the freelist
+
+
+### 慢路径 __slab_free
+走到这里说明现在释放的slab object并不位于当前`per_cpu kmem_cache`的slab里面，
+
+
+
+                           cpu->slab                              slab
+                      ┌─────────────────┐                 ┌────────────────────┐
+                      │##### data ######│                 │####################│
+                      ├─────────────────┤                 ├────────────────────┤
+                  ┌───┤                 │                 │####################│
+                  │   ├─────────────────┤                 ├────────────────────┤
+              freelist│##### data ######│                 │#### will free #####│
+                  │   ├─────────────────┤                 ├────────────────────┤
+                  └──►│                 ├──┐              │                    │
+                      ├─────────────────┤  │              ├────────────────────┤
+                      │                 │◄─┘              │####################│
+                      └─────────────────┘                 └────────────────────┘
+
+
+这里存在两种情况：
+1. 该object存在于当前当前`per_cpu kmem_cache` 的partial链表
+2. 该object既不在当前cpu的slab链表也不在partial链表
+
+```
+                                      __slab_free
+                                     free object to slab      
+                                               │
+                 slab full    slab one         │
+             if !freelist || inuse == 1 ◄──────┴─────else────┐                     dicard_slab
+                     &&  was_frozen=0                        │                   free the slab to buddy sys
+                       │                                     │                          ▲
+                       │                                     │                ┌─────────┴──────┐
+                       ├───────── else ───────────┐          ▼                │                │
+                       │                          │          │          remove_partial         │
+               if has cpu partial && !freelist    │          │        list_del the slab    remove_full
+                       │                          │          │                ▲                ▲
+                       ▼                          ▼          │                │                │
+                set slab.frozen = 1         get_node         │          if prior ──────────────┘
+                       │               get kmem_cache_node   │                │
+                       ▼                          │          │      !new.inuse && n->nr_partial >= s->min_partial
+                       ├─────────◄────────────────┘          │                │
+                       └────────►─────────┬────────◄─────────┘                │
+                                          │                                   │
+                                     if !node ───────────else─────────────────┴────────► remove_full from kmem_cache_node
+                                          │                                              add partial onto kmem_cache_node
+                                          ▼
+                             ┌────────────┴─────────────┐
+                        if was_frozen         !was_frozen && new.frozen
+                             │                          ▼
+                             └────────────┐         put_cpu_partial
+                                          │    put it onto the per cpu partial list
+                                          ▼             │
+                                       return◄──────────┘
+
+```
+
+
+
+
 
 
 
