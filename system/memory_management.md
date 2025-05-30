@@ -345,7 +345,6 @@ static int fallbacks[MIGRATE_TYPES][MIGRATE_PCPTYPES - 1] = {
 1. 该object存在于当前当前`per_cpu kmem_cache` 的partial链表
 2. 该object既不在当前cpu的slab链表也不在partial链表
 
-```
                                       __slab_free
                                      free object to slab      
                                                │
@@ -376,10 +375,81 @@ static int fallbacks[MIGRATE_TYPES][MIGRATE_PCPTYPES - 1] = {
                                           ▼             │
                                        return◄──────────┘
 
+
+
+# 进程虚拟内存
+
+> [!NOTE]
+> 首先需要明确以下几点:
+> 1. 各个进程虚拟空间是隔离的,他们通过页表来隔离
+> 2. 内核拥有进程的所有页表项，但进程只拥有部分内核页表项(用来与内核交互)
+> 3. 各个进程进入内核态切换内核页表后的部分页表项共享，也就是内核部分
+
+
+每个进程所对应的`struct task_struct->mm_struct`描述了用户空间进程的分布情况
+如下表示了
+```c
+
+struct mm_struct {
+    ...
+
+		unsigned long mmap_base;	/* base of mmap area */
+		unsigned long mmap_legacy_base;	/* base of mmap area in bottom-up allocations */
+...
+		unsigned long start_code, end_code, start_data, end_data;
+		unsigned long start_brk, brk, start_stack;
+		unsigned long arg_start, arg_end, env_start, env_end;
+...
+}
 ```
 
+需要注意的点：
+1. `start_code, end_code`: 代码段开始 
+2. `start_brk, brk`: 堆起始地址和结束地址
+3. `mmap_base`: mmap区域起始地址
 
 
+                              ┌───────┐
+                           │  │ stack │
+                           ▼  ├───────┤
+                           ▲  ├───────┤
+                           │  │ MMAP  │
+                              ├───────┤  mm->mmap_base
+                              │       │
+                           ▲  ├───────┤
+                           │  │ heap  │
+                              ├───────┤
+                              ├───────┤
+                              │ text  │
+                              └───────┘
+
+
+
+
+加载进程的时候会调用内核函数`load_elf_binary`
+
+## 内存映射
+用来在有限的内存空间中访问‘无限大’的文件
+当需要访问某个区域时进行查询
+
+内核通过`struct vm_area_struct`来保存进程中每个段的相信信息,
+想要获取该结构体需要通过`find_vma(mm, addr)`,
+其中mm是该进程对应的`mm_struct`,
+而addr表示希望查询的地址
+
+在现代linux内核中对于进程vma的索引使用B树来进行管理
+
+```c
+
+struct maple_tree {
+	union {
+		spinlock_t	ma_lock;
+		lockdep_map_p	ma_external_lock;
+	};
+	void __rcu      *ma_root;
+	unsigned int	ma_flags;
+};
+```
 
 
 
