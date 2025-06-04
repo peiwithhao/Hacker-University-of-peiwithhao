@@ -37,8 +37,26 @@ Tap device是linux内核提供的模拟真实网络接口的工具，
 默认例子可以如下配置
 
 ```sh
--device e1000,netdev=nd0 \
+-device e1000,netdev=nd0,mac=52:54:XX:XX:XX:XX \
 -netdev tap,id=nd0,ifname=tap0,script=no \
 ```
 
 他会自动在宿主机创建一个名称为tap0虚拟网卡,这个网卡用来虚拟机间通信
+要进行通讯我们还需要创建网桥然后将这些网卡分配到网桥
+```sh
+ip link set tap0 up
+ip link add br0 type bridge
+ip link set tap0 master br0
+ip link set br0 up
+```
+然后在虚拟机中分配IP之后就可以通过创建的网桥进行通讯了
+
+
+
+
+
+
+
+
+
+
