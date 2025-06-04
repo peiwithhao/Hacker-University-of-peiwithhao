@@ -1,6 +1,7 @@
-**
-!.gitignore
+*
 !CMakeLists.txt
-!include/*
-!src/*
+!include/
+!include/**
+!src/
+!src/**
 
