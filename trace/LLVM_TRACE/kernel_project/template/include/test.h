@@ -1,4 +1,4 @@
-#include "test.h"
+#include "FGVar.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/Analysis.h"
