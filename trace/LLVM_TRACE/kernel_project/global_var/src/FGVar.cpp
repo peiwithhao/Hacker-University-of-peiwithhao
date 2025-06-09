@@ -10,25 +10,29 @@ using namespace llvm;
 
 void inst_addr_printer(Instruction &Inst);
 void GlobalVarFinder::do_globalvar_finder(GlobalVariable &GV, GlobalVarFinder::Result &result){
-
-    if(GV.hasName())
-        errs() << "[+]GlobalVariable:\033[33m " << GV.getName() << "\033[0m\n";
-    else
-        errs() << "[x]Unknown Variable\n";
-
-    for(User *U: GV.users()){
-        if(Instruction *Inst = dyn_cast<Instruction>(U)){
-            inst_addr_printer(*Inst);
-            // errs()<< "\tUsed in Instruction: ";
-            // Inst->print(errs());
-            // errs() << "\n";
-        }else {
-            errs()<< "\tUsed in: ";
-            U->print(errs());
-            errs() << "\n";
+    if(GV.hasName()){
+        if (GV.getName().find("dirty_ratio")!=std::string::npos || GV.getName().find("dirty_background_ratio") != std::string::npos){
+            errs() << "\033\[34;1m[+]\033[0m GlobalVariable:\033[33m " << GV.getName() << "\033[0m\n";
+            for(User *U: GV.users()){
+                if(Instruction *Inst = dyn_cast<Instruction>(U)){
+                    errs() << "\t[+] Used in Instruction: ";
+                    inst_addr_printer(*Inst);
+                    // errs()<< "\tUsed in Instruction: ";
+                    // Inst->print(errs());
+                    // errs() << "\n";
+                }else if(Constant *Const = dyn_cast<Constant>(U)) {
+                    errs() << "\t[+] Used in Constant: ";
+                    Const->print(errs());
+                    errs() << "\n";
+                }else{
+                    errs() << "\t[+] Used in: "<< U->getName() << "\n";
+                }
+            }
+        }else{
+            return;
         }
-    }
-
+    }else
+        errs() << "\033\[31;1m[x]\033[0m Unknown Variable\n";
 }
 
 
@@ -89,9 +93,11 @@ void inst_addr_printer(Instruction &Inst){
         unsigned col = debugLoc.getCol();
         StringRef dir = debugLoc->getDirectory();
         StringRef filename = debugLoc->getFilename();
-        errs() << "[*]Instruction at \033[35m" << dir << "/" << filename << ":" << line << ":" << col << "\033[0m\n";
+        if(dir.find("virtio")!=std::string::npos || filename.find("virtio")!=std::string::npos ){
+            errs() << "\t[*]Instruction at \033[35m" << dir << "/" << filename << ":" << line << ":" << col << "\033[0m\n";
+        }
     }else{
-        errs() << "No debug Info Found...\n";
+        errs() << "\tNo debug Info Found...\n";
 
     }
 }
