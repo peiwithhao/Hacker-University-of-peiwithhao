@@ -605,6 +605,7 @@ $ export LLVM_COMPILER=clang
 ```c
 make CC=clang defconfig # 默认配置
 make CC=wllvm LLVM=1 #开始编译
+extract-bc vmlinux #提取bc
 ```
 
 ## 分析自定义驱动

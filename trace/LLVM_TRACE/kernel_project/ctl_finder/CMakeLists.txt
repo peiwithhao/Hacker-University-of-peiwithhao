@@ -32,9 +32,9 @@ if(NOT LLVM_ENABLE_RTTI)
 endif()
 
 
-add_library(ctxFinder SHARED src/ctxFinder.cpp)
+add_library(ctlFinder SHARED src/ctlFinder.cpp)
 
 # Allow undefined symbols in shared objects on Darwin (this is the default
 # behaviour on Linux)
-target_link_libraries(ctxFinder
+target_link_libraries(ctlFinder
   "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
