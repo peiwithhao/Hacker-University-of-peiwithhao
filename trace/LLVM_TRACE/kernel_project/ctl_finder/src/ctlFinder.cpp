@@ -10,6 +10,8 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/IR/DerivedUser.h"
 #include "llvm/IR/Operator.h"
+using llvm::Use;
+
 using namespace llvm;
 
 void inst_addr_printer(Instruction &Inst){
@@ -24,6 +26,43 @@ void inst_addr_printer(Instruction &Inst){
 
     }
 }
+
+void value_traverse(Value &v){
+    if (GetElementPtrInst *geInst = dyn_cast<GetElementPtrInst>(&v)){
+        geInst->print(errs());
+        errs() << "\n\t\t";
+        unsigned int numOperands = geInst->getNumOperands();
+        for (unsigned i = 0; i < numOperands; ++i) {
+            Value *operand = geInst->getOperand(i);
+
+            if (Instruction *defInst = dyn_cast<Instruction>(operand)) {
+                errs() << "Operand is defined by instruction: ";
+                defInst->print(errs());
+                errs() << "\n";
+            } else if (Argument *arg = dyn_cast<Argument>(operand)) {
+                errs() << "Operand is a function argument: ";
+                arg->print(errs());
+                errs() << "\n";
+            } else if (Constant *c = dyn_cast<Constant>(operand)) {
+                errs() << "Operand is a constant: ";
+                c->print(errs());
+                errs() << "\n";
+            } else {
+                errs() << "Unknown operand type: ";
+                operand->print(errs());
+                errs() << "\n";
+            }
+            errs() << "\t\t";
+        }
+        // Value * v_ptr = geInst->getPointerOperand();
+        // v_ptr->print(errs());
+        // value_traverse(*v_ptr);
+    }else{
+        v.print(errs());
+        errs() << "\n\t\t";
+    }
+}
+
 
 void ctlFinder::do_ctl_finder(GlobalVariable &GV, ctlFinder::Result &result){
     //ctl table array
@@ -74,11 +113,20 @@ void ctlFinder::do_ctl_checker(Result &result){
                 inst_addr_printer(*inst);
                 errs() << "\t\t";
                 if(CallBase *cb = dyn_cast<CallBase>(user)){
-                    errs() << "call base\n";
+                    errs() << "Call base: ====================\n\t\t";
+                    cb->print(errs());
+                    errs() << "\n\t\t";
                 }else if(CmpInst *ci = dyn_cast<CmpInst>(user)){
                     errs() << "CmpInst\n";
                 }else if(StoreInst *si = dyn_cast<StoreInst>(user)){
-                    errs() << "StoreInst\n";
+                    errs() << "Stored Value: ====================\n\t\t";
+                    si->print(errs());
+                    errs() << "\n\t\t";
+                    Value *store_target = si->getPointerOperand();
+                    value_traverse(*store_target);
+                    // store_target->print(errs());
+                    errs() << "\n";
+                    // errs() << "Stored Value: [" << si->getValueName()<< "\n";
                 }else if(GetElementPtrInst *gepi = dyn_cast<GetElementPtrInst>(user)){
                     errs() << "GetElementPtrInst\n";
                 }else if(PHINode *ph = dyn_cast<PHINode>(user)){
