@@ -1,5 +1,5 @@
-#ifndef _TEST_H
-#define _TEST_H
+#ifndef _KTFINDER_H
+#define _KTFINDER_H
 
 #include "llvm/IR/PassManager.h"
 #include "llvm/IR/Analysis.h"
@@ -10,23 +10,22 @@
 
 namespace llvm {
     //1. AnalysisPass1: Find the Global Variable
-    struct TemplateAnalyzer : AnalysisInfoMixin<TemplateAnalyzer>{
+    struct KTFinder : AnalysisInfoMixin<KTFinder>{
     public:
         using Result = std::vector<GlobalVariable *>;
         Result run(Module &M, ModuleAnalysisManager &);
     private:
-        friend struct AnalysisInfoMixin<TemplateAnalyzer>; 
+        friend struct AnalysisInfoMixin<KTFinder>; 
         static AnalysisKey Key;
     };
 
 
     //3. PrintPass1: Print the GLobal Variable
-    struct TemplateTransformer : PassInfoMixin<TemplateTransformer>{
+    struct KTPrinter : PassInfoMixin<KTPrinter>{
     public:
-        PreservedAnalyses run(Module &M, ModuleAnalysisManager &);
+        PreservedAnalyses run(Module &F, ModuleAnalysisManager &);
         static bool isRequired(){return true;}
     };
-
 }
 
 

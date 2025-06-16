@@ -1,4 +1,5 @@
-#include "test.h"
+#include "ktfinder.h"
+#include "utils.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
 #include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IR/Analysis.h"
@@ -9,38 +10,38 @@
 using namespace llvm;
 
 
-TemplateAnalyzer::Result TemplateAnalyzer::run(Module &M, ModuleAnalysisManager &MAM){
+
+KTFinder::Result KTFinder::run(Module &M, ModuleAnalysisManager &MAM){
     Result result;
-    for(GlobalVariable &GV : M.globals()){
-        result.push_back(&GV);
-    }
+    StringRef targetFuncName = "kthread_create_on_node";
+    Function *func = M.getFunction(targetFuncName);
+    if(func)
+        FunctionCallerTraverse(*func);
     return result;
 }
 
 
-PreservedAnalyses TemplateTransformer::run(Module &M, ModuleAnalysisManager &MAM){
-    auto &result = MAM.getResult<TemplateAnalyzer>(M);
-    errs() << "Module Name: " << M.getName() << "\n";
-    return PreservedAnalyses::all();
-}
+PreservedAnalyses KTPrinter::run(Module &M, ModuleAnalysisManager &MAM){
+    auto &result = MAM.getResult<KTFinder>(M);
+    return PreservedAnalyses::all(); }
 
 
-AnalysisKey TemplateAnalyzer::Key;
+AnalysisKey KTFinder::Key;
 
-PassPluginLibraryInfo getGlobalVarPluginInfo(){
+PassPluginLibraryInfo getKthreadFinderPluginInfo(){
     return {
-        LLVM_PLUGIN_API_VERSION,"GlobalVariablePlugin",LLVM_VERSION_STRING,
+        LLVM_PLUGIN_API_VERSION,"KthreadFinderPlugin",LLVM_VERSION_STRING,
         [](PassBuilder &PB){
             PB.registerAnalysisRegistrationCallback(
                    [](ModuleAnalysisManager &MAM){
-                    MAM.registerPass([&]{return TemplateAnalyzer();});
+                    MAM.registerPass([&]{return KTFinder();});
                 }
             );
 
             PB.registerPipelineParsingCallback(
             [](StringRef Name, ModulePassManager &MPM, ArrayRef<PassBuilder::PipelineElement>){
                     if (Name == "find-her"){
-                        MPM.addPass(TemplateTransformer());
+                        MPM.addPass(KTPrinter());
                         return true;
                     }
                     return false; });
@@ -51,7 +52,7 @@ PassPluginLibraryInfo getGlobalVarPluginInfo(){
 
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
 llvmGetPassPluginInfo() {
-  return getGlobalVarPluginInfo();
+  return getKthreadFinderPluginInfo();
 }
 
 
