@@ -7,9 +7,19 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Passes/PassBuilder.h"
+#include <queue>
+#include <system_error>
+#include "llvm/Support/FileSystem.h"
 using namespace llvm;
 // protected from duplicate user
 SmallPtrSet<const User *, 32> visited;
+
+std::error_code EC;
+
+llvm::raw_fd_ostream output("myoutput.txt", EC, sys::fs::OpenFlags::OF_None);
+llvm::raw_fd_ostream callerfunc("caller.txt", EC, sys::fs::OpenFlags::OF_None);
+
+
 
 size_t stack_buffer_level = 0;
 
@@ -138,7 +148,8 @@ void source_trace_back(llvm::User *user, unsigned int stack_level){
             // 未知类型
             if (Instruction *inst = dyn_cast<Instruction>(retuser)) {
                 if (DebugLoc debuginfo = inst->getDebugLoc()) {
-                    errs() << "  [dbg] at " << debuginfo->getFilename()
+                    output << "  [dbg] at " << debuginfo->getDirectory()
+                           << debuginfo->getFilename()
                            << ":" << debuginfo.getLine()
                            << ":" << debuginfo.getCol() << "\n";
                 }
@@ -146,6 +157,37 @@ void source_trace_back(llvm::User *user, unsigned int stack_level){
         }
     }
 }
+
+// std::vector<Function *> func_vec;
+
+
+llvm::DenseSet<llvm::Function*> func_visited;
+
+void do_CallerTrace(llvm::Function &func){
+    std::queue<Function *> func_q;
+    func_q.push(&func);
+    while(!func_q.empty()){
+        //获取队列头部
+        Function *callee_func = func_q.front();
+        if(!callee_func->getNumUses()){
+            errs() << callee_func->getName() << "\n";
+        }
+        for(User *user: callee_func->users()){
+            if(CallBase *ci = dyn_cast<CallBase>(user)){
+                if(Function *ci_func = ci->getFunction()){
+                    errs() << "\t" << ci_func->getName() << "\n";
+                    if(!func_visited.count(ci_func)){
+                        func_visited.insert(ci_func);
+                        func_q.push(ci->getFunction());
+                    }
+                }
+            }
+        }
+        func_q.pop();
+    }
+}
+
+
 
 
 void FunctionCallerTraverse(llvm::Function &func){

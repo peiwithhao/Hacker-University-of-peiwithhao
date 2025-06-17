@@ -26,6 +26,9 @@ include_directories(${PROJECT_INCLUDE})
 # 设置使用C++ 17标准
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "")
 
+
+add_compile_options(-Wno-deprecated)
+
 # LLVM 普遍在无RTTI下构建
 if(NOT LLVM_ENABLE_RTTI)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}" -fno-rtti)

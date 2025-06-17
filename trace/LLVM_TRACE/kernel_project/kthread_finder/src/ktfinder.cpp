@@ -16,7 +16,8 @@ KTFinder::Result KTFinder::run(Module &M, ModuleAnalysisManager &MAM){
     StringRef targetFuncName = "kthread_create_on_node";
     Function *func = M.getFunction(targetFuncName);
     if(func)
-        FunctionCallerTraverse(*func);
+        do_CallerTrace(*func);
+        // FunctionCallerTraverse(*func);
     return result;
 }
 

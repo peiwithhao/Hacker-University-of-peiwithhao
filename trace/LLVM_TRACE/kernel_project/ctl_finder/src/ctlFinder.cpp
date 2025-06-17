@@ -10,9 +10,14 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/IR/DerivedUser.h"
 #include "llvm/IR/Operator.h"
-using llvm::Use;
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/FileSystem.h"
+
+std::error_code EC;
 
 using namespace llvm;
+
+llvm::raw_fd_ostream outfile("myoutput.txt", EC, llvm::sys::fs::OpenFlags::OF_None);
 
 void inst_addr_printer(Instruction &Inst){
     if(const DebugLoc &debugLoc  = Inst.getDebugLoc()){
@@ -96,6 +101,7 @@ void ctlFinder::do_ctl_finder(GlobalVariable &GV, ctlFinder::Result &result){
                     // if(1){
                         ctl_table_flag = true;
                         // errs() << GV.getName() << "\n";
+                        outfile << GV.getName().str() << "\n";
                         result.push_back(&GV);
                         break;
                     }

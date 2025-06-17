@@ -6,4 +6,5 @@ using namespace llvm;
 
 void FunctionCallerTraverse(llvm::Function &func);
 void source_trace_back(llvm::User *user, unsigned int stack_level);
+void do_CallerTrace(llvm::Function &func);
 
