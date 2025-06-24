@@ -13,7 +13,7 @@ using namespace llvm;
 
 KTFinder::Result KTFinder::run(Module &M, ModuleAnalysisManager &MAM){
     Result result;
-    StringRef targetFuncName = "kthread_create_on_node";
+    StringRef targetFuncName = "nf_conntrack_alloc";
     Function *func = M.getFunction(targetFuncName);
     if(func)
         do_CallerTrace(*func);

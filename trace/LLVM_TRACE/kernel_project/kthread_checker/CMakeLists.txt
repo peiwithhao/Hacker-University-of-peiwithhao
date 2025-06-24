@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.31.2)
-project(my-pass-template)
+project(kthread_checker)
 
 
-set(LT_LLVM_INSTALL_DIR "/home/peiwithhao/Desktop/llvm-19/install/" CACHE PATH "LLVM installation directory")
+set(LT_LLVM_INSTALL_DIR "/usr/bin/" CACHE PATH "LLVM installation directory")
 set(PROJECT_INCLUDE "./include/" CACHE PATH "Project include directory")
 set(LT_LLVM_INCLUDE_DIR "${LT_LLVM_INSTALL_DIR}/include/")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -27,8 +27,8 @@ include_directories(${PROJECT_INCLUDE})
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "")
 
 
-# 清除警告
 add_compile_options(-Wno-deprecated)
+
 
 
 # LLVM 普遍在无RTTI下构建
@@ -37,9 +37,9 @@ if(NOT LLVM_ENABLE_RTTI)
 endif()
 
 
-add_library(test SHARED src/test.cpp)
+add_library(ktchecker SHARED src/ktchecker.cpp)
 
 # Allow undefined symbols in shared objects on Darwin (this is the default
 # behaviour on Linux)
-target_link_libraries(test
+target_link_libraries(ktchecker
   "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")

@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.31.2)
 project(my-pass-template)
 
 
-set(LT_LLVM_INSTALL_DIR "/home/peiwithhao/Desktop/llvm-19/install/" CACHE PATH "LLVM installation directory")
+set(LT_LLVM_INSTALL_DIR "/home/peiwithhao/Desktop/llvm-19/build/" CACHE PATH "LLVM installation directory")
 set(PROJECT_INCLUDE "./include/" CACHE PATH "Project include directory")
 set(LT_LLVM_INCLUDE_DIR "${LT_LLVM_INSTALL_DIR}/include/")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

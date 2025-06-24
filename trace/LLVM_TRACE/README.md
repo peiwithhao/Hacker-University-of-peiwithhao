@@ -589,7 +589,7 @@ struct pipe_buffer{
 # 编译Linux内核
 实际上只需要使用
 ```sh
-$ make LLVM=1 -j<your cores_nr>
+$ make LLVM=<path to your llvm-project/clang, it will automate inject other llvm-tools> -j<your cores_nr>
 ```
 就可以正常编译
 
@@ -604,7 +604,8 @@ $ export LLVM_COMPILER=clang
 
 ```c
 make CC=clang defconfig # 默认配置
-make CC=wllvm LLVM=1 #开始编译
+# 取消勾选General setup->compile the kernel with warning as Errors
+make CC=wllvm LLVM=<Path to your llvm tools> #开始编译
 extract-bc vmlinux #提取bc
 ```
 

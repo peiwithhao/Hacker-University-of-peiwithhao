@@ -175,10 +175,10 @@ void do_CallerTrace(llvm::Function &func){
         for(User *user: callee_func->users()){
             if(CallBase *ci = dyn_cast<CallBase>(user)){
                 if(Function *ci_func = ci->getFunction()){
-                    errs() << "\t" << ci_func->getName() << "\n";
+                    // errs() << "\t" << ci_func->getName() << "\n";
                     if(!func_visited.count(ci_func)){
                         func_visited.insert(ci_func);
-                        func_q.push(ci->getFunction());
+                        func_q.push(ci_func);
                     }
                 }
             }
