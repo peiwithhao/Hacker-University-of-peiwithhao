@@ -37,7 +37,9 @@ if(NOT LLVM_ENABLE_RTTI)
 endif()
 
 
-add_library(ktchecker SHARED src/ktchecker.cpp)
+add_library(ktchecker SHARED 
+    src/ktchecker.cpp
+    src/utils.cpp)
 
 # Allow undefined symbols in shared objects on Darwin (this is the default
 # behaviour on Linux)

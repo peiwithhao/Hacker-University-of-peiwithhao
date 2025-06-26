@@ -1,3 +1,2 @@
-kthread_run_on_cpu
 kthread_create_on_node
 kthread_create_on_cpu
