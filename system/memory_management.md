@@ -163,32 +163,64 @@ static int fallbacks[MIGRATE_TYPES][MIGRATE_PCPTYPES - 1] = {
 ### alloc_pages
 
 
-            ┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
-            │                                                                                                     │
-            │   alloc_pages                                                 alloc_pages_node                      │
-            │       │                                                               │                             │
-            │       ▼                                                               ▼                             │
-            │   alloc_pages_node ──────────►__alloc_pages_node            __alloc_pages_node                      │
-            │                                      │                                │                             │
-            │                                      ▼                                │                             │
-            │                               __alloc_pages ◄─────────────────────────┘                             │
-            │                                      │                                                              │
-            │               ┌──────────────────────┴─────────┬───────────────────────────────────┐                │
-            │               ▼                                ▼                                   ▼                │
-            │      prepare_alloc_pages             get_page_from_freelist                 alloc_pages_slowpath    │  
-            │       获取zonelist信息                      分配新页面                        回收页面减轻压力      │
-            │                                                 │                                分配新页面         │
-            │                                                 ▼                                                   │
-            │                                               rmqueue                                               │
-            │                                                 │                                                   │
-            │                                   ┌─────────────┴──────────────┐                                    │
-            │                                   │                            │                                    │
-            │                                   ▼                            ▼                                    │
-            │                           rmqueue_pcplist             rmqueue_buddysystem                           │
-            │                           1. 从pcp list分配              2. 从全局伙伴系统分配                      │
-            └─────────────────────────────────────────────────────────────────────────────────────────────────────┘
+            
+                                                                                                                 
+               alloc_pages                                                 alloc_pages_node                      
+                   │                                                               │                             
+                   ▼                                                               ▼                             
+               alloc_pages_node ──────────►__alloc_pages_node            __alloc_pages_node                      
+                                                  │                                │                             
+                                                  ▼                                │                             
+                                           __alloc_pages ◄─────────────────────────┘                             
+                                                  │                                                              
+                           ┌──────────────────────┴─────────┬───────────────────────────────────┐                
+                           ▼                                ▼                                   ▼                
+                  prepare_alloc_pages             get_page_from_freelist                 alloc_pages_slowpath      
+                  get zonelist info                  alloc new pages                        reclaim pages
+                                                             │                               alloc new pages
+                                                             ▼                                                   
+                                                           rmqueue                                               
+                                                             │                                                   
+                                               ┌─────────────┴──────────────┐                                    
+                                               │                            │                                    
+                                               ▼                            ▼                                    
+                                       rmqueue_pcplist             rmqueue_buddysystem                           
+                                      order < 3 allocation         allocate from buddysystem         
+                                               │
+                                         ┌─────┴──────────────────┐
+                                     empty(pcp list)        not empty
+                                         ▼                        ▼
+                                     rmqueu_bulk             return pcp_list chunk
+                                reload pcp from buddysystem
 
 上图就是其中分配页面的大概调用情况
+
+1. `prepare_alloc_pages()`: 准备`alloc_context`结构体
+```c
+struct alloc_context {
+	struct zonelist *zonelist;
+	nodemask_t *nodemask;
+	struct zoneref *preferred_zoneref;
+	int migratetype;
+
+	/*
+	 * highest_zoneidx represents highest usable zone index of
+	 * the allocation request. Due to the nature of the zone,
+	 * memory on lower zone than the highest_zoneidx will be
+	 * protected by lowmem_reserve[highest_zoneidx].
+	 *
+	 * highest_zoneidx is also used by reclaim/compaction to limit
+	 * the target zone since higher zone than this index cannot be
+	 * usable for this allocation request.
+	 */
+	enum zone_type highest_zoneidx;
+	bool spread_dirty_pages;
+};
+```
+
+> [!NOTE]
+> 如果rmqueue_pcplist 分配失败，则继续rmqueue_buddysystem,如果仍然分配失败，则进入慢路径
+
 
 
 ### free_pages
@@ -212,6 +244,45 @@ static int fallbacks[MIGRATE_TYPES][MIGRATE_PCPTYPES - 1] = {
             │                                   寻找页面伙伴然后合并                       │
             └──────────────────────────────────────────────────────────────────────────────┘
 
+重要函数`__free_pages()`内容如下:
+
+```c
+void __free_pages(struct page *page, unsigned int order)
+{
+	/* get PageHead before we drop reference */
+	int head = PageHead(page);
+
+	if (put_page_testzero(page))
+		free_the_page(page, order);
+	else if (!head)
+		while (order-- > 0)
+			free_the_page(page + (1 << order), order);
+}
+EXPORT_SYMBOL(__free_pages);
+```
+
+
+                             __free_pages
+                                  │
+                ┌──get pagehead───┴─────┬──────────────────┐
+                │                  page.refcount == 0      │
+                │                       │            page.refcount != 0
+                ▼                       ▼                  │
+             1. PageHead         free_the_page             ├───────────┐
+       Judge if it is compound page                ┌───────┘     it is compound page
+                                           if head == null             ▼
+                                                   ▼                  ret
+                                    free the other remain page
+
+
+1. 调用`put_page_testzero()`,该函数检测传递页面的`refcount`,如果为0则根据order释放该page多个page
+2. 如果refcount不为0, 则首先判断该page是不是符合页的头部，如果是头部说明是复合页(compound page)，则不进行处理
+3. 如果不是头部(不是compound pag)，则说明有其他使用者在引用该页，则继续处理这些页中剩下的页面,从后往前进行order递减释放,
+
+> [!NOTE]
+> 这里只释放后续页面是为了防止有时内核为了性能预增加一个页引用，如果之后没人引用这个页，则将其释放掉，但如果这个释放操作只会处理单页面，
+> 则对于一个非复合页，则会造成后续页面的泄漏，这里只是提前释放防止这个事故的出生
+ 
 
 ## 不连续页的分配
 内核使用vmalloc来分配不连续区域，分配的虚拟内存在`vmalloc/ioremap`区域
@@ -258,7 +329,7 @@ static int fallbacks[MIGRATE_TYPES][MIGRATE_PCPTYPES - 1] = {
 ## kmalloc
 
                          如果分配大小大于8k
-               kmalloc ─────────────►  kmalloc_large
+               kmalloc ─────────────►  kmalloc_large ───────► alloc_pages_node
                   │ 小于8k
                   ▼
               __kmalloc_ ─────► __do_kmalloc_node
