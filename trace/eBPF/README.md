@@ -277,7 +277,7 @@ int handle_exec(struct trace_event_raw_sched_process_exec *ctx)
 }
 ```
 
-
+关于这里SEC宏可以从[内核文档](https://docs.kernel.org/bpf/libbpf/program_types.html)中获取
 
 
 
@@ -285,5 +285,5 @@ int handle_exec(struct trace_event_raw_sched_process_exec *ctx)
 
 
 [https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_TRACING/](https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_TRACING/)
-
+[https://docs.kernel.org/bpf/libbpf/program_types.html](https://docs.kernel.org/bpf/libbpf/program_types.html)
 
