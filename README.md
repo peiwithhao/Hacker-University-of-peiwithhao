@@ -1,4 +1,6 @@
-<img src="/home/peiwithhao/repo/Hacker-University-of-peiwithhao/img/README_logo.png" width="360">
+<p align="center">
+    <img src="./img/README_logo.png" width="360">
+</p>
 
 # Hacker-University-of-peiwithhao
 
