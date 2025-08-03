@@ -1,3 +1,18 @@
+<!--toc:start-->
+- [kubelet简介](#kubelet简介)
+- [kubelet](#kubelet)
+- [kubelet组成](#kubelet组成)
+  - [PLEG](#pleg)
+  - [PodWorkers](#podworkers)
+  - [PodManager](#podmanager)
+  - [ContainerRuntime](#containerruntime)
+  - [PodConfig](#podconfig)
+  - [syncLoop](#syncloop)
+- [kubelet进程](#kubelet进程)
+- [kubelet工作原理](#kubelet工作原理)
+- [参考](#参考)
+<!--toc:end-->
+
 # kubelet简介
 他最底层实际上是集群中每个node节点(包括work node 和 control node)所拥有的一个服务进程,
 其主要职责是接收api server对于节点中pod的管控,还有对集群内部pod状况的检查并且将报告呈现给api server
@@ -18,7 +33,6 @@ kubelet由以下内容组成
 ## PLEG
 全名`Pod Lifecycle Event Generator`, Pod生命周期事件生成器
 这些事件包括`ContainerStarted、ContainerDied、ContainerRemoved、 ContainerChanged`
-
 其定期通过`ContainerRuntime`获取Pod信息，与缓存中的信息比较
 
 ## PodWorkers
@@ -48,16 +62,181 @@ kubelet由以下内容组成
 # kubelet工作原理
 ![工作原理](./img/kubelet工作原理.png)
 
+kubelet源码结构
+```sh
+❯ lt
+ .
+├──  app
+│   ├──  auth.go
+│   ├──  init_others.go
+│   ├──  init_windows.go
+│   ├──  init_windows_test.go
+│   ├──  options
+│   │   ├──  container_runtime.go
+│   │   ├──  globalflags.go
+│   │   ├──  globalflags_linux.go
+│   │   ├──  globalflags_other.go
+│   │   ├──  options.go
+│   │   ├──  options_test.go
+│   │   ├──  osflags_others.go │   │   └──  osflags_windows.go
+│   ├── 󰡯 OWNERS
+│   ├──  plugins.go
+│   ├──  plugins_providers.go
+│   ├──  server.go
+│   ├──  server_bootstrap_test.go
+│   ├──  server_linux.go
+│   ├──  server_others.go
+│   ├──  server_test.go
+│   ├──  server_unsupported.go
+│   └──  server_windows.go
+├──  kubelet.go
+└── 󰡯 OWNERS
+```
+
+其中main函数位于`kubelet.go`当中
+```go
+func main() {
+	command := app.NewKubeletCommand()
+	code := cli.Run(command)
+	os.Exit(code)
+}
+```
+创建了一个`NewKubeletCommand`然后运行
+
+```go
+
+func NewKubeletCommand() *cobra.Command {
+	cleanFlagSet := pflag.NewFlagSet(server.ComponentKubelet, pflag.ContinueOnError)
+	cleanFlagSet.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
+	kubeletFlags := options.NewKubeletFlags()
+
+	kubeletConfig, err := options.NewKubeletConfiguration()
+	// programmer error
+	if err != nil {
+		klog.ErrorS(err, "Failed to create a new kubelet configuration")
+		os.Exit(1)
+	}
+
+	cmd := &cobra.Command{
+		Use: server.ComponentKubelet,
+		Long: `The kubelet is the primary "node agent" that runs on each...
+		DisableFlagParsing: true,
+		SilenceUsage:       true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+            ...
+			return Run(ctx, kubeletServer, kubeletDeps, utilfeature.DefaultFeatureGate)
+        },
+    }
+    ...
+
+	return cmd
+}
+```
+NewKubeletCommand 则是创建了一个 `cobra.Commnad`对象然后返回
+
+其中RunE创建了kubeletServer, 这里封装了启动kubelet所需要的所有参数
+```go
+
+			// construct a KubeletServer from kubeletFlags and kubeletConfig
+			kubeletServer := &options.KubeletServer{
+				KubeletFlags:         *kubeletFlags,
+				KubeletConfiguration: *kubeletConfig,
+			}
+```
+
+kubeletDeps是用于存放Kubelet所需物品的容器， 使用kubeletServer来构造默认的KubeletDeps
+```go
+
+			kubeletDeps, err := UnsecuredDependencies(kubeletServer, utilfeature.DefaultFeatureGate)
+```
+
+这里对于RunE的赋值，最后的Run函数如下,运行指定的KubeletServer
+```go
+
+func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) error {
+	// To help debugging, immediately log version
+	klog.InfoS("Kubelet version", "kubeletVersion", version.Get())
+
+	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
+
+	if err := initForOS(s.KubeletFlags.WindowsService, s.KubeletFlags.WindowsPriorityClass); err != nil {
+		return fmt.Errorf("failed OS init: %w", err)
+	}
+	if err := run(ctx, s, kubeDeps, featureGate); err != nil {
+		return fmt.Errorf("failed to run Kubelet: %w", err)
+	}
+	return nil
+}
+```
+
+在这里的run函数里面，将初始化KubeDeps.KubeClient, 创建两个独立的客户端，kubeDeps.EventClient 用于事件，
+kubeDeps.HeartbeatClient用于心跳
+```go
+
+	case kubeDeps.KubeClient == nil, kubeDeps.EventClient == nil, kubeDeps.HeartbeatClient == nil:
+        ...
+		kubeDeps.KubeClient, err = clientset.NewForConfig(clientConfig)
+		if err != nil {
+			return fmt.Errorf("failed to initialize kubelet client: %w", err)
+		}
+
+		// make a separate client for events
+		eventClientConfig := *clientConfig
+        ...
+		heartbeatClientConfig := *clientConfig
+        ...
+```
+
+之后启动healthz服务, 如果指定了healthzPort, 则启动healthz服务， healthz是本地主机healthz的端口，0表示禁用
+
+```go
+
+	if s.HealthzPort > 0 {
+		mux := http.NewServeMux()
+		healthz.InstallHandler(mux)
+		go wait.Until(func() {
+			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(int(s.HealthzPort))), mux)
+			if err != nil {
+				klog.ErrorS(err, "Failed to start healthz server")
+			}
+		}, 5*time.Second, wait.NeverStop)
+	}
+```
 
 
+启动kubelet则通过`RunKubelet`来设置和运行
+```go
+
+	if err := RunKubelet(ctx, s, kubeDeps); err != nil {
+```
 
 
+在Runkubelet中将调用`startKubelet`
+
+```go
+
+func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableServer bool) {
+	// start the kubelet
+	go k.Run(podCfg.Updates())
+
+	// start the kubelet server
+	if enableServer {
+		go k.ListenAndServe(kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
+	}
+	if kubeCfg.ReadOnlyPort > 0 {
+		go k.ListenAndServeReadOnly(netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), kubeDeps.TracerProvider)
+	}
+	go k.ListenAndServePodResources()
+}
+```
+其中`k.Run`启动kubelet来响应配置更新，他会运行`kubernetes/pkg/kubelet`模块中的代码
 
 
 
 # 参考
 [https://xie.infoq.cn/article/15f32abba2f2c86b50e004cb5](https://xie.infoq.cn/article/15f32abba2f2c86b50e004cb5)
 [https://isekiro.com/kubernetes%E6%BA%90%E7%A0%81-kubelet-%E5%8E%9F%E7%90%86%E5%92%8C%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E4%B8%80/](https://isekiro.com/kubernetes%E6%BA%90%E7%A0%81-kubelet-%E5%8E%9F%E7%90%86%E5%92%8C%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90%E4%B8%80/)
+[https://able8.medium.com/kubernetes-source-code-overview-kubelet-7783234a0e4a](https://able8.medium.com/kubernetes-source-code-overview-kubelet-7783234a0e4a) 
 
 
 
