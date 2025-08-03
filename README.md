@@ -1,4 +1,7 @@
+<img src="/home/peiwithhao/repo/Hacker-University-of-peiwithhao/img/README_logo.png" width="360">
+
 # Hacker-University-of-peiwithhao
+
 Welcome hackers!
 Here is the Hacker University of Peiwithhao(HUP)! :)
 
