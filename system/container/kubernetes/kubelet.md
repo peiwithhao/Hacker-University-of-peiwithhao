@@ -12,6 +12,79 @@
 - [kubelet工作原理](#kubelet工作原理)
 - [参考](#参考)
 <!--toc:end-->
+# kubernetes 源码目录解析
+从github上面clone下来k8s
+```sh
+git clone https://github.com/kubernetes/kubernetes.git
+```
+
+目录结构
+```sh
+❯ ll
+drwxr-xr-x    - peiwithhao 2025-07-23 15:33  _output
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  api
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12 󱧼 build
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  CHANGELOG
+lrwxrwxrwx    - peiwithhao 2025-02-18 16:12  CHANGELOG.md -> CHANGELOG/README.md
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  cluster
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  cmd
+.rw-r--r--  148 peiwithhao 2025-02-18 16:12  code-of-conduct.md
+.rw-r--r--  525 peiwithhao 2025-02-18 16:12  CONTRIBUTING.md
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  docs
+.rw-r--r--  12k peiwithhao 2025-02-18 16:12  go.mod
+.rw-r--r--  64k peiwithhao 2025-02-18 16:12  go.sum
+.rw-r--r-- 1.2k peiwithhao 2025-02-18 16:12  go.work
+.rw-r--r--  16k peiwithhao 2025-02-18 16:12  go.work.sum
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  hack
+.rw-r--r--  11k peiwithhao 2025-02-18 16:12  LICENSE
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  LICENSES
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  logo
+lrwxrwxrwx    - peiwithhao 2025-02-18 16:12  Makefile -> build/root/Makefile
+.rw-r--r--  846 peiwithhao 2025-02-18 16:12 󰡯 OWNERS
+.rw-r--r--  12k peiwithhao 2025-02-18 16:12 󰡯 OWNERS_ALIASES
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  pkg
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  plugin
+.rw-r--r-- 4.4k peiwithhao 2025-02-18 16:12 󰂺 README.md
+.rw-r--r--  665 peiwithhao 2025-02-18 16:12 󰡯 SECURITY_CONTACTS
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  staging
+.rw-r--r-- 1.1k peiwithhao 2025-02-18 16:12  SUPPORT.md
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  test
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  third_party
+drwxr-xr-x    - peiwithhao 2025-02-18 16:12  vendor
+```
+由于kuberntes是使用cobra进行搭建，因此我们所需要看的不同组件的代码位于`cmd/`目录下
+该目录包含一些重要的组件，例如耳熟能详的`kube-apiserver, kubelet, kubectl`等等
+```sh
+❯ ll
+...
+drwxr-xr-x   - peiwithhao 2025-02-18 16:12  kube-apiserver
+drwxr-xr-x   - peiwithhao 2025-02-18 16:12  kube-controller-manager
+drwxr-xr-x   - peiwithhao 2025-02-18 16:12  kube-proxy
+drwxr-xr-x   - peiwithhao 2025-02-18 16:12  kube-scheduler
+drwxr-xr-x   - peiwithhao 2025-02-18 16:12  kubeadm
+drwxr-xr-x   - peiwithhao 2025-02-18 16:12  kubectl
+drwxr-xr-x   - peiwithhao 2025-02-18 16:12  kubectl-convert
+drwxr-xr-x   - peiwithhao 2025-02-18 16:12  kubelet
+...
+```
+
+## 符号解析
+在我们逆向go的时候可能会碰到很长的一串符号名称，例如`k8s.io/apiserver/pkg/endpoints/handlers/responsewriters.(*deferredResponseWriter).Write`
+符号真的长无语，这里我们可能需要结合源代码进行分析，所以了解整个k8s的项目布局十分重要，因为该符号同时也给我们指明了一定的目录地址
+
+首先`k8s.io`这里是kubernetes官方维护的Go模块的顶级import path 前缀，用于模块化整个项目
+
+
+|Go Import Path|说明|对应代码库|
+|--|--|--|
+|k8s.io/apiserver|API server 公共模块|[github.com/kubernetes/apiserver](github.com/kubernetes/apiserver) |
+|k8s.io/kubelet|kubelet独立模块|[github.com/kubernetes/kubelet](github.com/kubernetes/kubelet) |
+|k8s.io/kubernetes|主仓库，聚焦所有组件|[github.com/kubernetes/kubernetes](github.com/kubernetes/kubernetes) |
+
+
+如果说符号名称是`k8s.io/kubernetes`开头，那很有可能源代码目录位于clone的主仓库的主目录下，例如
+`k8s.io/kubernetes/pkg/kubelet.(*runtimeState).setRuntimeSync`,他就位于`kubernetes/pkg/kubelet`
+如果说是其他的模块，例如上面的`k8s.io/apiserver`,那么他们将会位于`kubernetes/staging/src/k8s.io/apiserver`目录下,其他模块同理
 
 # kubelet简介
 他最底层实际上是集群中每个node节点(包括work node 和 control node)所拥有的一个服务进程,
