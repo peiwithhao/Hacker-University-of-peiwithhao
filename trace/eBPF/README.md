@@ -279,7 +279,10 @@ int handle_exec(struct trace_event_raw_sched_process_exec *ctx)
 
 关于这里SEC宏可以从[内核文档](https://docs.kernel.org/bpf/libbpf/program_types.html)中获取
 
-
+# ebpf helper
+获取方式有两种: 
+1. 通过`man bpf_helpers`获取欧
+2. 通过`bpftool feature probe`
 
 # 参考
 
