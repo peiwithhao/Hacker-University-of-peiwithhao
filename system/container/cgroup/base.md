@@ -1,3 +1,18 @@
+<!--toc:start-->
+- [cgroup 概述](#cgroup-概述)
+- [cgroup使用](#cgroup使用)
+- [cgroup v2](#cgroup-v2)
+- [cgroup 核心文件接口](#cgroup-核心文件接口)
+- [控制器](#控制器)
+  - [cpu 接口文件](#cpu-接口文件)
+  - [memory 接口文件](#memory-接口文件)
+  - [IO接口文件](#io接口文件)
+  - [PID接口文件](#pid接口文件)
+  - [Cpuset接口文件](#cpuset接口文件)
+  - [RDMA接口文件](#rdma接口文件)
+- [参考](#参考)
+<!--toc:end-->
+
 README大部分分析使用源码了，这里主要分析他的使用
 # cgroup 概述
 cgroups主要提供下面四个功能:
@@ -289,11 +304,65 @@ cgroup v2: `Documentation/admin-guide/cgroup-v2.rst`
     + `pgdemote_proactive`: 主动降级的页面数量
     + `hugetlb`: hugetlb页面占用的内存量
 + memory.swap.current: 该cgroup及其后代当前正在使用的交换总量
++ memory.swap.high: 默认为max, 交换空间使用限制，如果超过此限制，则所有后续分配都将受到限制
++ memory.swap.peak: 记录的cgroup及其后代的最大交换使用情况
++ memory.swap.max: 交换空间使用的硬限制，如果答案到此限制，那么该cgroup的匿名内存将不会被换出
++ memory.swap.events: 存在下列条目
+    + high: cgroup的交换使用量超过高阈值的次数
+    + max: cgroup的交换使用将超出最大边界且交换分配失败的次数
+    + fail: 由于系统范围内的交换空间不足或最大限制而导致交换分配失败
++ memory.zswap.current: zswap压缩后端后的内存总量
++ memory.zswap.max: zswap使用硬限制， 如果cgroup的zswap池达到此限制，他将拒绝现有条目故障恢复或写入磁盘之前接受任何存储
++ memory.zswap.writeback: 为0时所有交换设备的交换尝试均被禁用
++ memory.pressure: 显示内存的压力失速信息
 
 
+## IO接口文件
 
++ io.stat: 行以$MAJ:$MIN为键, 定义了下列嵌套key
+    |rbytes|Bytes read|
+    |--|--|
+    |wbytes|Bytes written|
+    |rios|Number of read IOs|
+    |wios|Number of write IOs|
+    |dbytes|Bytes discarded|
+    |dios|Number of discard IOs|
++ io.max: 基于BPS和IOPS的IO限制 
++ io.pressure: 显示IO的压力速失信息
+
+## PID接口文件
++ pids.max: 进程数量硬性限制
++ pids.current: cgroup及其后代中当前的进程数量
++ pids.peak: cgroup及其后代中进程数量曾经达到的最大值
+
+## Cpuset接口文件
++ cpuset.cpus: 列出此cgroup中任务所申请额定cpu资源
++ cpuset.cpus.effective: 列出了此cgroup的父cgroup实际授予的在线cpu, 该值将会受到cpu热插拔时间的影响
++ cpuset.mems: 此cgroup中人物所申请的内存节点
++ cpuset.mems.effective: 列出了此cgroup的父cgroup实际授予的在线内存节点
++ cpuset.cpus.exclusive: 列出所有允许用于创建新cpuset分区额定独占CPU
++ cpuset.cpus.exclusive.effective: 显示用于创建分区根的有效独占CPUset
+
+
+## RDMA接口文件
++ rdma.max: 描述RDMA/IB 设备当前的资源限制
++ rdma.current: 描述当前资源使用情况的只读文件
+
+## HugeTLB接口文件
++ hugetlb.<hugepagesize>.current: 显示"hugepagesize" hugetlb的当前使用情况
++ hugetlb.<hugepagesize>.max: 使用量的硬限制
++ hugetlb.<hugepagesize>.events: 默认为max, 表示由于HugeTLB限制导致分配的次数
++ hugetlb.<hugepagesize>.events.local: 类似上部分
++ hugetlb.<hugepagesize>.numa_stat: 显示hugetlb页的numa信息
+
+## Misc 杂项接口文件
++ misc.capacity: 显示平台上可用的各种标量资源及其数量
++ misc.current: 显示cgroup及其子组内资源的当前使用情况
++ misc.peak: 显示cgroup及其子cgroup的历史最大资源使用情况
++ misc.max: 允许最大使用cgroup的资源
 
 
 # 参考
 [https://medium.com/starbugs/%E7%AC%AC%E4%B8%80%E5%8D%83%E9%9B%B6%E4%B8%80%E7%AF%87%E7%9A%84-cgroups-%E4%BB%8B%E7%B4%B9-a1c5005be88c](https://medium.com/starbugs/%E7%AC%AC%E4%B8%80%E5%8D%83%E9%9B%B6%E4%B8%80%E7%AF%87%E7%9A%84-cgroups-%E4%BB%8B%E7%B4%B9-a1c5005be88c) 
+[https://docs.kernel.org/admin-guide/cgroup-v2.html](https://docs.kernel.org/admin-guide/cgroup-v2.html)
 
