@@ -564,3 +564,19 @@ Attack Surface:
  [ Locked   ] Support for /dev/kmem access (CONFIG_DEVKMEM)
               https://github.com/mzet-/les-res/blob/master/features/devkmem.md
 ```
+
+12. 容器情况: 
+```sh
+g2689271477@cloudshell:~/linux-exploit-suggester (valiant-hangout-471107-d6)$  cat /proc/1/cgroup
+0::/k8s.io/bfc3e3b3f69e000d39433f5c66fe8907ff9aa082477a21df58acb7c00606b764
+```
+
+
+
+# 自动漏洞测试工具
+这些github仓库只搜集公开的CVE
+
+[https://github.com/The-Z-Labs/linux-exploit-suggester](https://github.com/The-Z-Labs/linux-exploit-suggester)
+[https://github.com/jondonas/linux-exploit-suggester-2](https://github.com/jondonas/linux-exploit-suggester-2)
+[https://github.com/liamg/traitor](https://github.com/liamg/traitor)
+[https://github.com/peass-ng/PEASS-ng](https://github.com/peass-ng/PEASS-ng)
