@@ -1,3 +1,6 @@
+# eBPF 
+调用所需权限:`cap_bpf`
+
 eBPF所支持的追踪变量
 libbpf是一个用来方便用户编写eBPF程序的库函数框架,因此里面提供了许多供我们使用的函数API,其中要找到eBPF所支持的追踪变量,我们可以直接寻找其中提供的`src/bpf_helper_defs.h`
 
@@ -16,8 +19,7 @@ libbpf是一个用来方便用户编写eBPF程序的库函数框架,因此里面
 | bpf_get_current_task()               | struct task_struct       | 返回当前进程/任务的PCB指针                                   |
 | bpf_get_numa_node_id()               | numa_id                  | 若是NUMA架构,则其返回当前socket包所使用的numa_id             |
 | bpf_get_socket_cookie()              | socket cookie            | 如果存在cookie则返回,若不存在则新生成一个cookie返回          |
-| bpf_get_socket_uid()                 | socket_uid               | 获取该socket拥有者的id                                       |
-| bpf_get_ns_current_pid_tgid()        | pid tgid in ns           | 命名空间中的pid和tgid                                        |
+| bpf_get_socket_uid()                 | socket_uid               | 获取该socket拥有者的id                                       | | bpf_get_ns_current_pid_tgid()        | pid tgid in ns           | 命名空间中的pid和tgid                                        |
 | bpf_current_task_under_cgroup()      | context                  | 测试运行实例使用cgroupv1还是cgroupv2                         |
 | bpf_get_current_cgroup_id()          | cgroup id                | 返回当前进程所处于的cgroup id                                |
 | bpf_get_current_ancestor_cgroup_id() | id of cgroupv2           | 返回当前进程所处于的cgroup祖先的cgroup id                    |
@@ -284,9 +286,22 @@ int handle_exec(struct trace_event_raw_sched_process_exec *ctx)
 1. 通过`man bpf_helpers`获取欧
 2. 通过`bpftool feature probe`
 
+# KFunc 
+是一种存在于bpf-helper 之外的函数,主要是为了拓展一些bpf-helpers的功能,
+使用它可以通过[自行编写内核模块](https://eunomia.dev/zh/tutorials/43-kfuncs/)加载然后使用eBPF程序调用
+其次还可以调用一些[内核预定义的KFunc](https://docs.ebpf.io/linux/concepts/kfuncs/)来使用
+但其中API并不如bpf-helper那般稳定，例如相关字符串的操作在6.17的[commmit](https://github.com/torvalds/linux/commit/e91370550f1fe6fa3b02e8bf9762e3dc0a02fcad)中才被引入主线
+
+
+
+
+
+
 # 参考
 
 
 [https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_TRACING/](https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_TRACING/)
 [https://docs.kernel.org/bpf/libbpf/program_types.html](https://docs.kernel.org/bpf/libbpf/program_types.html)
 
+[https://eunomia.dev/zh/tutorials/43-kfuncs/](https://eunomia.dev/zh/tutorials/43-kfuncs/)
+[https://docs.ebpf.io/linux/concepts/kfuncs/](https://docs.ebpf.io/linux/concepts/kfuncs/)
