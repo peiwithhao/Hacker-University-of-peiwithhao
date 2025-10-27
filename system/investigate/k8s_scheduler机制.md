@@ -4,6 +4,9 @@ scheduler的调度机制主要分两个阶段:
 1. 过滤(Filter): 遍历所有节点，筛选出不满足 Pod 运行条件的节点。例如，如果一个节点的 CPU 或内存不足以满足 Pod 的请求（request），那么这个节点就会被过滤掉。
 2. 打分(Score): 为所有通过过滤阶段的节点进行打分。每个评分插件都会对节点打一个分数，最后调度器会综合所有插件的分数，选择得分最高的节点来运行 Pod。
 
+打分启动具体代码位于`pkg/scheduler/schedule_one.go`
+
+
 
 ##  打分插件
 
@@ -415,6 +418,47 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 }
 ```
 
+
+
+cadvisor 在访问machineinfo的时候将会读取`/proc/meminfo`,这将获取其中的MemTotal等文件
+```go
+var (
+	coreRegExp = regexp.MustCompile(`(?m)^core id\s*:\s*([0-9]+)$`)
+	nodeRegExp = regexp.MustCompile(`(?m)^physical id\s*:\s*([0-9]+)$`)
+	// Power systems have a different format so cater for both
+	cpuClockSpeedMHz     = regexp.MustCompile(`(?:cpu MHz|CPU MHz|clock)\s*:\s*([0-9]+\.[0-9]+)(?:MHz)?`)
+	memoryCapacityRegexp = regexp.MustCompile(`MemTotal:\s*([0-9]+) kB`)
+	swapCapacityRegexp   = regexp.MustCompile(`SwapTotal:\s*([0-9]+) kB`)
+	vendorIDRegexp       = regexp.MustCompile(`vendor_id\s*:\s*(\w+)`)
+
+	cpuAttributesPath  = "/sys/devices/system/cpu/"
+	isMemoryController = regexp.MustCompile("mc[0-9]+")
+	isDimm             = regexp.MustCompile("dimm[0-9]+")
+	machineArch        = getMachineArch()
+	maxFreqFile        = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq"
+)
+```
+
+
+
+# 测试项目
++ eBPF修改`/proc/meminfo`是否有效
+    1. 通过打印日志得出在集群中对于 `/proc/meminfo`的读取分为4段,因此需要限制读取时机
+    2. 修改后使用普通进程读取meminfo成功,在此基础上对集群读取进行劫持
+    ![meminfohook](./img/meminfo_hook.png)
+
+    
++ `kubectl describe node`所显示的memory信息是否为动态值
+    1. 以正确劫持meminfo的程序作为基础，修改MemTotal发现在已经运行的集群上面并没有差异
+    2. 重新启动集群在启动前放置eBPF劫持程序发现才会改变，结合代码得出结论该字段属于是静态资源，因此在集群创建之后就无法改变
+    ![node_describe](./img/node_describe.png)
+
++ 修改其他meminfo的其他信息例如`MemAvailable`
+    1. 修改节点kube-scheduler输出日志等级，查看代码发现等级10可以输出分数
+    2. 在没劫持meminfo的启动集群情况下发现对于普通nginx pod的评分noderesource一栏为58
+    3. 在劫持meminfo,也就是修改MemTotal, MemFree, MemAvailable 之后发现评分变为13
+    4. 在13分的情况下，停止劫持读取内容但发现评分并未变化，结论可能是评分机制也仅仅依赖于创建节点的静态信息
+    ![score](./img/score.png)
 
 
 
