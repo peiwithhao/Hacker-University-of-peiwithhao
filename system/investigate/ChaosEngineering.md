@@ -1,8 +1,10 @@
 # 混沌工程/故障注入工具调研
-## Choas Monkey
+## 1. Choas Monkey
 
 Chaos Monkey 是由 Netflix 开发的混沌工程工具，主要用于在生产环境中自动和随机地终止虚拟机实例，以测试系统的弹性和容错能力。其核心思想是通过制造不可预期的故障，确保系统能够自动恢复并保持高可用性。
 当前版本的 Chaos Monkey 已完全集成到 Spinnaker 中，这是 Netflix 使用的持续交付平台。
+Spinnaker是一个由 Netflix 创建并开源的、功能强大的多云持续交付（Continuous Delivery）平台,负责将软件从代码仓库安全、快速、可靠地发布到生产
+  环境中。
 
 ### 工作原理
 
@@ -13,8 +15,8 @@ Chaos Monkey 是由 Netflix 开发的混沌工程工具，主要用于在生产�
 
 
 Chaos Monkey 通过以下步骤进行工作：
-1. 选择目标实例：Chaos Monkey 随机选择一个或多个虚拟机实例（或容器）作为目标。
-2. 停止实例：它会立即停止目标实例，模拟硬件故障、实例宕机或其他系统故障。
+1. 选择目标实例：Chaos Monkey 随机选择一个或多个虚拟机实例（或容器）作为目标, 这些目标是通过预配置的构建池(配置组)中获得
+2. 停止实例：它会通过Spinnaker平台立即停止目标实例，模拟硬件故障、实例宕机或其他系统故障。
 3. 监控系统反应：Chaos Monkey 会观察系统如何应对实例停止的情况，并记录系统的反应。
 4. 验证恢复能力：系统的自我修复能力、故障转移机制、容错能力等将被检验。如果系统能够恢复并保持正常运行，Chaos Monkey 认为实验成功；否则，团队会根据结果进行问题分析和修复。
 
@@ -31,11 +33,7 @@ Chaos Monkey 旨在通过以下几个方面帮助企业和开发团队提高系�
 Chaos Monkey 的工作流程可以分为以下几个阶段：
 
 1. 定义目标和范围：在使用 Chaos Monkey 之前，团队需要定义实验的目标，明确实验的范围和要解决的具体问题。例如，团队可能希望验证服务的高可用性，或者测试某个特定依赖项的恢复能力。
-2. 选择故障注入类型：Chaos Monkey 可以注入多种类型的故障，常见的故障类型包括：
-    + 实例宕机（即模拟服务器的崩溃或停止运行）
-    + 网络中断（模拟服务之间的网络连接丢失）
-    + CPU 占用率高（模拟资源耗尽的情况）
-    + 磁盘故障（模拟硬盘损坏）
+2. 选择故障注入类型：Chaos Monkey 仅仅注入单种类型的故障,即实例宕机（即模拟服务器的崩溃或停止运行）
 3. 执行实验并监控：启动实验后，Chaos Monkey 会在系统中随机选择目标实例并执行故障注入。工程师需要监控系统反应，观察是否发生了预期的故障，并记录相关数据。
 4. 分析结果和优化：实验结束后，团队需要分析系统的表现，找出可能的弱点和瓶颈，并进行相应的优化。这一过程可以帮助团队持续改进系统架构，增强其容错性和可靠性。
 
@@ -50,11 +48,127 @@ Chaos Monkey 的工作流程可以分为以下几个阶段：
 - 通过访问控制和配置文件限制可操作的服务和实例，避免误操作。
 - 支持与 CI/CD 流程集成，实现自动化混沌测试。
 
-## Choas Toolkit
+## 2. Choas Toolkit
 
-## LitmusChaos
+### 工作目标
 
-## ChaosBlade
+由两个简单的微服务组成，通过HTTPS相互通信
+
+### 工作流程
+![ctk flow](./img/ctk.flow.svg) 
+
+它的核心功能是帮助编写和执行混沌工程实验，以测试系统在面对混乱和预期外故障时的弹性和恢复能力
+  。它旨在让所有工程师都能实践混沌工程。
+
+  其工作方式是通过一个声明式的实验文件（通常是 JSON 或 YAML 格式），您可以在其中定义：
+      1. 稳态假设（Steady-State Hypothesis）: 系统的正常状态是怎样的。
+      2. 探测（Probes）: 在实验之前、之中和之后运行，用于验证系统是否处于稳态。
+      3. 行动（Actions）: 注入到系统中的具体故障或事件，例如关闭一个服务、增加网络延迟等。
+      4. 回滚（Rollbacks）: 在实验结束后，用于撤销“行动”所做更改，使系统恢复原状的补偿操作。
+
+具体的执行流程如下：
+
+ 1. 发现与验证 (Discovery & Validation)
+       * 发现: 工具首先会查找并加载所有已安装的扩展（extensions），以了解当前环境所有可用的“行动”（Actions）和“探测”（Probes）。
+       * 验证: 接着，它会读取并解析您的实验文件（JSON/YAML），检查其语法是否正确，并确认实验中声明要使用的所有“行动”和“探测”是否在已发现的扩展中都存在。如果语
+         法错误或找不到对应的功能，流程会在此处失败并退出。
+
+   2. 稳态假设检验 (Steady-State Hypothesis)
+       * 工具会执行“稳态假设” (steady_state_hypothesis) 区块中定义的所有“探测”（Probes）。
+       * 目的: 验证系统在实验开始前是否处于“健康”或“正常”的预期状态。
+       * 如果任何一个探测失败，意味着系统在实验开始前就已经不正常了。默认情况下，实验会立即停止，以防止在不健康的系统上注入更多混乱。
+
+   3. 执行方法 (Method)
+       * 只有当稳态假设检验通过后，工具才会开始执行 method 区块。这是注入混沌的核心步骤。
+       * method 区块包含一个或多个“行动”（Actions），它们会按顺序执行，对系统施加干扰（例如，关闭一台服务器）。
+       * 在 method 区块中，您也可以穿插一些“探测”（Probes），用于在注入故障期间持续观察系统的状态。
+
+   4. 再次检验稳态假设 (Post-Chaos Check)
+       * 在 method 区块执行完毕后，工具会再一次执行“稳态假设” (steady_state_hypothesis) 区块中的所有探测。
+       * 目的: 检验在经历了“行动”的干扰后，您的系统是否仍然保持（或恢复到）“健康”状态。
+       * 实验结果: 如果此时所有探测都通过，意味着您的系统成功地抵御了这次混沌事件，实验被认为是成功的。如果任何一个探测失败，则证明系统未能保持稳定，实验失败。
+
+   5. 执行回滚 (Rollbacks)
+       * 无论实验成功与否，工具最后都会执行 rollbacks 区块中定义的操作。
+       * 目的: 
+         清理和撤销“行动”对系统所做的更改，使其恢复到实验开始前的状态（例如，重启之前被关闭的服务器）。这是一个“清理”步骤，旨在确保实验环境的可重复使用性。
+
+### 设计思想
+
+Chaos Toolkit 的工作流程体现了其深刻的设计思想，这些思想源于科学实验的方法论。
+
+   1. 声明式与开放性 (Declarative & Open)
+       * 实验是用简单的 JSON 或 YAML 文件声明的，而不是用复杂的代码编写。这使得非开发人员也能读懂、编写和审查实验，降低了混沌工程的门槛。
+       * 它是一个开放的平台，不绑定任何特定的技术或云厂商。通过可插拔的扩展模型，它可以适应任何系统。
+
+   2. 可验证与可证伪性 (Verifiable & Falsifiable)
+       * 设计的核心是稳态假设。您不是在随机地破坏系统，而是在验证一个明确的假设：“即使我这样做，系统也应该保持正常”。
+       * 通过在实验前后运行两次相同的探测，工具严格地验证了这个假设是否成立。这种方法让混沌工程从“破坏东西”变成了严谨的、可度量的科学实验。
+
+   3. 安全与可控 (Safe & Controlled)
+       * 事前检查: 如果系统在实验前就不稳定，实验不会运行。
+       * 事后清理: rollbacks 机制确保实验环境可以被清理和恢复，最大限度地减少实验的意外影响。
+       * 整个流程是透明且可预测的，用户清楚地知道每一步会发生什么。
+
+### 所支持的故障类型
+
+ chaostoolkit 本身是一个核心框架和实验运行器，其强大之处在于它的可扩展性。它本身不包含一个固定的 、内置的“故障类型”列表。 相反，具体的“故障类型”（即“行动”和“探测”）是通过驱动扩展（Driver Extensions）来提供的。您可以根据目标平台（如 Kubernetes, AWS, Azure,  或者本地进程）安装相应的扩展，从而获得在该平台上执行混沌实验的能力。
+
+  这意味着它几乎可以支持任何类型的故障，只要能通过 Python 代码实现它。例如：
+
+   * 应用层故障: 模拟应用崩溃、增加 CPU 或内存负载、引入延迟。
+   * 网络层故障: 模拟网络中断、丢包、DNS 查询失败。
+   * 基础设施层故障: 终止云主机实例 (VMs)、关闭容器 (Pods)、移除存储卷。
+   * 平台层故障: 模拟 API 限流、认证失败。
+
+## 3. LitmusChaos
+
+### 基本介绍
+
+石蕊是一组用于云原生混沌工程的工具。石蕊为运维人员提供了人工控制混沌的工具，用以在所部署的环境中找到软件设计的缺陷。运维人员可以使用石蕊在暂存区乃至生产环境里通过混沌实验来找出逻辑错误和软件漏洞。通过修复这些软件的缺陷，可以提升系统的整体抗打击能力。
+
+石蕊以云原生的方法来创建，管理和监控混沌事件，通过以下的KubernetesCRD对象来实现对混沌事件的编排：
+
+- **ChaosEngine**: 通过这个对象来关联一个Kubernnetes的应用或是Kubernetes节点。石蕊的Chaos-Operator会watch这个对象并触发混沌事件。
+- **ChaosExperiment**: 这个对象包含了一组混沌事件的配置。当ChaoseEngine触发混沌事件的时候，operator就会创建ChaoseExpeiment对象。
+- **ChaosResult**: 这个对象会保留混沌事件的结果。这个对象是ChaosEngine触发混沌事件时由operator创建的。
+
+![litmus](./img/litmus.png)
+
+### 注意事项
+
+- 网络混沌测试目前不支持除Docker以外的容器运行时，如containerd和CRIO
+- 石蕊混沌控制器以及混沌测试对象以Kubernetes资源的形式运行于Kubernetes集群中。在airgap环境需要在把镜像以及CR定义预先加载到机器上。
+- 对于特定公有云平台(如AWS，GCP)，账号信息是通过Kubernetes secret的方式传入的。别的传入方式尚需进一步测试及实现。
+- 一些混沌测试需要从pod里调用Docker API所以需要挂载Docker socket。需要自行判断是否要给开发者/运维权限来运行这些测试。
+- 在一些(少数)情况下混沌测试需要privileged container权限
+
+### 工作流
+
+![./litmus.png](./img/litmuschaos.png)
+
+故障执行在创建 ChaosEngine 资源时触发。ChaosEngine 资源与 Chaos Runner 交互，后者由 Chaos Operator  创建。Chaos Runner 创建故障作业来执行故障业务逻辑。通常，这些 ChaosEngine 嵌入在 Litmus  混沌实验的“步骤”中。但是，也可以手动创建和应用 Chaos Engine，然后由 Chaos Operator  协调此资源并触发故障执行。Chaos 故障分为以下几类：
+
+- Kubernetes Faults
+  - Pod-Level Chaos 
+  - Node-Level Chaos 
+- Application Chaos 
+- Cloud Infrastructure 
+
+#### 故障注入步骤
+
+1. 混乱故障执行由故障作业触发
+2. 获取故障可调参数和低级执行细节
+3. ChaosResult 被初始化并且其判决被更新为“Awaited”以表明故障当前正在运行
+4. 验证相应故障的稳态条件。如果发现条件无效，则停止故障执行，并将 ChaosResult 更新为“失败”
+5. 一旦验证了稳态条件，就会创建故障资源以促进混沌注入
+6. 对目标资源执行混沌注入，持续指定的混沌持续时间
+7. 混沌注入被恢复
+8. 进行混沌后状态检查以确保稳定状态仍然保持
+9. 如果检查无效，ChaosEngine 和 ChaosResult 判定将更新为“失败”，否则将更新为“通过”
+10. Fault execution ends. 故障执行结束
+
+## 4. ChaosBlade
 ### 基本介绍
 
 ChaosBlade 是阿里巴巴开源的一款遵循混沌工程原理和混沌实验模型的实验注入工具，帮助企业提升分布式系统的容错能力，并且在企业上云或往云原生系统迁移过程中业务连续性保障。
@@ -85,7 +199,7 @@ ChaosBlade支持丰富的实验场景，场景包括：
 chaosblade-operator 项目是针对云原生平台所实现的混沌实验注入工具，遵循混沌实验模型规范化实验场景，把实验定义为 Kubernetes CRD 资源，将实验模型映射为 Kubernetes 资源属性，很友好地将混沌实验模型与 Kubernetes 声明式设计结合在一起，在依靠混沌实验模型便捷开发场景的同时，又可以很好的结合 Kubernetes 设计理念，通过 kubectl 或者编写代码直接调用 Kubernetes API 来创建、更新、删除混沌实验，而且资源状态可以非常清晰地表示实验的执行状态，标准化实现 Kubernetes 故障注入。除了使用上述方式执行实验外，还可以使用 chaosblade cli 方式非常方便的执行 kubernetes 实验场景，查询实验状态等
 ![cloudnative](./img/chaosblade_cloudnative.png)
 
-## Chaos Mesh
+## 5. Chaos Mesh
 Chaos Mesh 是一个开源的云原生混沌工程平台，提供丰富的故障模拟类型，具有强大的故障场景编排能力，
 方便用户在开发测试中以及生产环境中模拟现实世界中可能出现的各类异常，帮助用户发现系统潜在的问题。Chaos Mesh 提供完善的可视化操作，旨在降低用户进行混沌工程的门槛。用户可以方便地在 Web UI 界面上设计自己的混沌场景，以及监控混沌实验的运行状态。
 
@@ -150,4 +264,11 @@ Chaos Mesh 通过 Kubernetes 原生的 RBAC（基于角色的权限控制）功�
 # 参考
 [https://github.com/chaos-mesh/chaosd?tab=readme-ov-file](https://github.com/chaos-mesh/chaosd?tab=readme-ov-file) 
 [https://github.com/chaos-mesh/chaos-mesh/tree/master/controllers](https://github.com/chaos-mesh/chaos-mesh/tree/master/controllers)
-- [https://github.com/Netflix/chaosmonkey](https://github.com/Netflix/chaosmonkey)
+
+[https://github.com/Netflix/chaosmonkey](https://github.com/Netflix/chaosmonkey)
+
+[https://chaostoolkit.org/reference/tutorials/run-flow/](https://chaostoolkit.org/reference/tutorials/run-flow/)
+
+[https://github.com/litmuschaos/litmus/blob/master/translations/README-chn.md](https://github.com/litmuschaos/litmus/blob/master/translations/README-chn.md)
+
+[https://docs.litmuschaos.io/docs/introduction/features](https://docs.litmuschaos.io/docs/introduction/features)
